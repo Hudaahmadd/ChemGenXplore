@@ -8,9 +8,12 @@ ___
 
 ![Overview Figure](www/overview_figure.png)
 
+___
+
+## Introduction 
+
 Chemical genomic screens are a valuable resource for uncovering gene functions and mapping biological pathways. However, their large-scale nature makes these datasets complex and challenging to interpret. ChemGenXplore addresses this challenge by simplifying access to these resources and providing researchers with an intuitive platform to explore and understand genotype-phenotype relationships across various species."
 
-___
 
 ## Features
 
