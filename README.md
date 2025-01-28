@@ -12,7 +12,7 @@ ___
 
 ## Introduction 
 
-Chemical genomic screens are a valuable resource for uncovering gene functions and mapping biological pathways. However, their large-scale nature makes these datasets complex and challenging to interpret. ChemGenXplore addresses this challenge by simplifying access to these resources and providing researchers with an intuitive platform to explore and understand genotype-phenotype relationships across various species."
+Chemical genomic screens are a valuable resource for uncovering gene functions and mapping biological pathways. However, their large-scale nature makes these datasets complex and challenging to interpret. ChemGenXplore addresses this challenge by simplifying access to these resources and providing researchers with an intuitive platform to explore and understand genotype-phenotype relationships across various species.
 
 
 ## Features
@@ -50,4 +50,12 @@ Chemical genomic screens are a valuable resource for uncovering gene functions a
 1. Clone the repository:
    ```bash
    git clone https://github.com/Hudaahmadd/ChemGenXplore.git
+
+## Contact 
+
+For enquiries, please contact Huda Ahmad, Institute of Microbiology and Infection, School of Biosciences, University of Birmingham. This work is conducted in collaboration with:
+Newcastle University Biosciences Institute, Faculty of Medical Sciences, Newcastle University.
+Laboratory of Infectious Disease Epidemiology, KAUST Center of Excellence for Smart Health, and the Biological and Environmental Science and Engineering (BESE) Division, King Abdullah University of Science and Technology (KAUST).
+
+
 
