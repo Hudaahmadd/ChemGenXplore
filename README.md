@@ -12,7 +12,6 @@ Chemical genomic screens are a valuable resource for uncovering gene functions a
 
 ___
 
-# Introduction
 ## Features
 
 - **Phenotypic Visualisation**:
