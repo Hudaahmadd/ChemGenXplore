@@ -10,12 +10,38 @@ ___
 ![Overview Figure](www/overview_figure.png)
 
 
+Chemical genomic screens are a valuable resource for uncovering gene functions and mapping biological pathways. However, their large-scale nature makes these datasets complex and challenging to interpret. ChemGenXplore addresses this challenge by simplifying access to these resources and providing researchers with an intuitive platform to explore and understand genotype-phenotype relationships across various species."
+
+
 ## Features
-- **Phenotypic Visualisation**: Interactive plots for exploring gene- and condition-specific fitness scores.
-- **Correlation Analyses**: Quantitative assessment of gene-gene and condition-condition correlations.
-- **GO & KEGG Enrichment Analysis**: Functional enrichment analysis for the *Escherichia coli* dataset.
-- **Customisable Heatmaps**: Clustering and distance metric options for hierarchical data exploration.
-- **Downloadable Results**: Export plots and processed datasets for further computational analyses.
+
+- **Phenotypic Visualisation**:
+  - Explore gene- and condition-specific phenotypic scores through dynamic bar plots and interactive data tables.
+  - Adjust the **False Discovery Rate (FDR)** threshold to highlight statistically significant phenotypes.
+
+- **Correlation Analyses**:
+  - Quantitatively assess **gene-gene** and **condition-condition** correlations using **Pearson’s correlation coefficient**.
+  - Correlations exceeding ±0.4 are displayed as significant, with options to adjust the FDR threshold.
+  - Explore positive and negative correlations for genes and conditions through interactive plots.
+
+- **GO & KEGG Enrichment Analysis**:
+  - Perform Gene Ontology (GO) and KEGG pathway enrichment analyses for the *Escherichia coli* dataset.
+  - Visualise significant enrichment terms as interactive bar plots.
+  - Download enrichment results and plots for further exploration.
+
+- **Customisable Heatmaps**:
+  - Generate hierarchical heatmaps for gene-condition fitness data.
+  - Customise clustering options with methods like **complete**, **single**, **average**, and **Ward D**.
+  - Choose from multiple distance metrics (e.g., **Euclidean**, **Manhattan**) for clustering rows and columns.
+  - Zoom in on specific regions of the heatmap and download the results.
+
+- **Upload Your Own Dataset**:
+  - Use the app’s upload feature to analyse custom datasets.
+  - Automatically compute Z-scores, FDR-adjusted p-values, and other metrics for your uploaded data.
+
+- **Downloadable Results**:
+  - Export processed datasets, plots, and heatmaps in user-friendly formats (e.g., **CSV**, **PDF**).
+
 
 ## How to Run the App
 
