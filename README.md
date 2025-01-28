@@ -1,7 +1,9 @@
 <p align="center">
   <img src="www/logo.png" alt="Logo" width="500">
 </p>
+
 ---
+
 **ChemGenXplore** is an interactive **Shiny** application designed for the visualisation and analysis of chemical genomic screens. This tool enables the exploration of gene- and condition-specific phenotypes, correlation analyses, and enrichment analyses, providing an intuitive platform for investigating large-scale chemical-genomic datasets.
 
 ![Overview Figure](www/overview_figure.png)
