@@ -1,4 +1,4 @@
-<img src="www/logo.png" alt="Logo" width="200"/>
+<img src="www/logo.png" alt="Logo" width="500"/>
 
 # ChemGenXplore
 
