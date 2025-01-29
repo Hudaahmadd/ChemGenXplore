@@ -48,7 +48,7 @@
               tags$img(
                 src = paste0("data:image/png;base64,", encoded_logo),
                 alt = "ChemGenXplore Logo", # Accessible text for the logo
-                style = "max-height: 150px; width: auto; border-radius: 10px;" 
+                style = "max-width: 450px; width: 65%; min-width: 220px; height: auto; border-radius: 10px;" 
               )
             )
           )
