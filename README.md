@@ -75,7 +75,6 @@ To run **ChemGenXplore** locally, follow these steps:
   cd ChemGenXplore
 
 3. **Run the Application
-Launch the app by running the following command in your terminal:
 
   ```bash
   Rscript app.R
