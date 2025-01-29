@@ -59,7 +59,7 @@ The easiest way to use **ChemGenXplore** is through the hosted Shiny application
 
 ---
 
-### Option 2: Local 
+### Option 2: Local Installation
 
 To run **ChemGenXplore** locally, follow these steps:
 
@@ -73,14 +73,14 @@ To run **ChemGenXplore** locally, follow these steps:
 
 Change into the project directory:
    ```bash
-   cd ChemGenXplore
-
-4. **Run the Application
+    cd ChemGenXplore
+   ```
+3. **Run the Application**
 
 Launch the app by running the following command in your terminal:
    ```bash
-   Rscript app.R
-
+Rscript app.R
+   ```
 Alternatively, you can open the app.R file in RStudio and click Run App.
 
 ## Data Sources
