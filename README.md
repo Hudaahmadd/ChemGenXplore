@@ -53,6 +53,11 @@ Chemical genomic screens are a valuable resource for uncovering gene functions a
    ```bash
    git clone https://github.com/Hudaahmadd/ChemGenXplore.git
 
+   Navigate to the project directory and open the R script:
+  ```bash
+  Rscript app.R
+The application will launch in your default web browser.
+
 ## Data Sources
 ChemGenXplore includes three pre-integrated, publicly available *Escherichia coli* datasets from chemical genomic screens. These datasets provide fitness scores across a wide range of conditions and serve as the foundation for the analyses performed in ChemGenXplore:
 
