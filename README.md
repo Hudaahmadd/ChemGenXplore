@@ -19,31 +19,30 @@ Chemical genomic screens are a valuable resource for uncovering gene functions a
 
 - **Phenotypic Visualisation**:
   - Explore gene- and condition-specific phenotypic scores through dynamic bar plots and interactive data tables.
-  - Adjust the **False Discovery Rate (FDR)** threshold to highlight statistically significant phenotypes.
+  - Filter statistically significant phenotypes with an adjustable False Discovery Rate (FDR) threshold.
 
 - **Correlation Analyses**:
-  - Quantitatively assess **gene-gene** and **condition-condition** correlations using **Pearson’s correlation coefficient**.
-  - Correlations exceeding ±0.4 are displayed as significant, with options to adjust the FDR threshold.
-  - Explore positive and negative correlations for genes and conditions through interactive plots.
-
-- **GO & KEGG Enrichment Analysis**:
+  - Assess gene-gene and condition-condition correlations using Pearson’s correlation coefficient.
+  - Filter for significant correlations exceeding ±0.4 with an adjustable FDR threshold.
+  - Visualise positive and negative correlations for genes and conditions through interactive plots.
+ 
+- **Enrichment Analysis**:
   - Perform Gene Ontology (GO) and KEGG pathway enrichment analyses for the *Escherichia coli* dataset.
+  - Adjust the FDR threshold to refine enrichment results.
   - Visualise significant enrichment terms as interactive bar plots.
-  - Download enrichment results and plots for further exploration.
 
-- **Customisable Heatmaps**:
-  - Generate hierarchical heatmaps for gene-condition fitness data.
-  - Customise clustering options with methods like **complete**, **single**, **average**, and **Ward D**.
-  - Choose from multiple distance metrics (e.g., **Euclidean**, **Manhattan**) for clustering rows and columns.
-  - Zoom in on specific regions of the heatmap and download the results.
+- **Interactive Heatmaps**:
+  - Generate hierarchical heatmaps for gene-condition phenotypic scores.
+  - Customise clustering with multiple methods (Complete, Single, Average, Ward D) and distance metrics (Euclidean, Manhattan, Maximum, Canberra).
+  - Choose from multiple distance metrics (e.g., Euclidean, Manhattan) for clustering rows and columns.
+  - Interact with heatmaps by zooming into specific regions.
 
 - **Upload Your Own Dataset**:
-  - Use the app’s upload feature to analyse custom datasets.
-  - Automatically compute Z-scores, FDR-adjusted p-values, and other metrics for your uploaded data.
+  - Upload custom datasets formatted with genes as rows and conditions as columns. Example below:
+    ![Example Dataset](www/example_dataset.png)
+  - Use the same phenotypic, correlation, enrichment, and heatmap analysis tools available for the E. coli dataset.
 
-- **Downloadable Results**:
-  - Export processed datasets, plots, and heatmaps in user-friendly formats (e.g., **CSV**, **PDF**).
-
+**All plots and data tables generated can be downloaded.**
 
 ## How to Run the App
 
