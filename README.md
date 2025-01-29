@@ -40,7 +40,7 @@ Chemical genomic screens are a valuable resource for uncovering gene functions a
 - **Upload Your Own Dataset**:
   - Upload custom datasets formatted with genes as rows and conditions as columns. Example below:
     <p>
-      <img src="www/example_dataset.png" alt="Logo" width="200">
+      <img src="www/example_dataset.png" alt="Logo" width="300">
     </p>
     
   - Use the same phenotypic, correlation, enrichment, and heatmap analysis tools available for the E. coli dataset.
