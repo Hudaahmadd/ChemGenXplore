@@ -51,14 +51,21 @@ Chemical genomic screens are a valuable resource for uncovering gene functions a
    ```bash
    git clone https://github.com/Hudaahmadd/ChemGenXplore.git
 
+## Acknowledgment
+
+ChemGenXplore was developed with the support of The Banzhaf Lab and The Moradigaravand Lab.
+
+- Institute of Microbiology and Infection, School of Biosciences, University of Birmingham, Birmingham, UK
+- Biosciences Institute, Faculty of Medical Sciences, Newcastle University, Newcastle upon Tyne, UK
+- Laboratory of Infectious Disease Epidemiology, KAUST Center of Excellence for Smart Health, Biological and Environmental Science and Engineering (BESE) Division, King Abdullah University of Science and Technology (KAUST), Thuwal, Saudi Arabia
+
+With gratitude, I acknowledge the funding provided by The Darwin Trust of Edinburgh for my PhD studies.
+
+
 ## Contact 
 
 For enquiries, please contact Huda Ahmad, Institute of Microbiology and Infection, School of Biosciences, University of Birmingham.
 
-This work is conducted in collaboration with:
-
-- The Banzhaf Lab, Newcastle University Biosciences Institute, Faculty of Medical Sciences, Newcastle University.
-- The Moradigaravand Lab, Laboratory of Infectious Disease Epidemiology, KAUST Center of Excellence for Smart Health, and the Biological and Environmental Science and Engineering (BESE) Division, King Abdullah University of Science and Technology (KAUST). 
 
 
 
