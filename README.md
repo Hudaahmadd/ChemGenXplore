@@ -8,7 +8,6 @@ ___
 
 ![Overview Figure](www/overview_figure.png)
 
-___
 
 ## Introduction 
 
