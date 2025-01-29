@@ -51,6 +51,15 @@ Chemical genomic screens are a valuable resource for uncovering gene functions a
    ```bash
    git clone https://github.com/Hudaahmadd/ChemGenXplore.git
 
+## Data Sources
+ChemGenXplore includes three pre-integrated, publicly available Escherichia coli datasets from chemical genomic screens. These datasets provide fitness scores across a wide range of conditions and serve as the foundation for the analyses performed in ChemGenXplore:
+
+- Nichols et al., 2011: https://doi.org/10.1016/j.cell.2010.11.052
+- Shiver et al., 2016: https://doi.org/10.1371/journal.pgen.1006124
+- Price et al., 2018: https://doi.org/10.1038/s41586-018-0124-0
+
+Users also have the flexibility to upload their own datasets for analysis.
+
 ## Acknowledgment
 
 ChemGenXplore was developed with the support of The Banzhaf Lab and The Moradigaravand Lab.
