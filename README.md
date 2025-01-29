@@ -54,8 +54,8 @@ Chemical genomic screens are a valuable resource for uncovering gene functions a
 ## Contact 
 
 For enquiries, please contact Huda Ahmad, Institute of Microbiology and Infection, School of Biosciences, University of Birmingham. This work is conducted in collaboration with:
-Newcastle University Biosciences Institute, Faculty of Medical Sciences, Newcastle University.
-Laboratory of Infectious Disease Epidemiology, KAUST Center of Excellence for Smart Health, and the Biological and Environmental Science and Engineering (BESE) Division, King Abdullah University of Science and Technology (KAUST).
+- Newcastle University Biosciences Institute, Faculty of Medical Sciences, Newcastle University.
+- Laboratory of Infectious Disease Epidemiology, KAUST Center of Excellence for Smart Health, and the Biological and Environmental Science and Engineering (BESE) Division, King Abdullah University of Science and Technology (KAUST).
 
 
 
