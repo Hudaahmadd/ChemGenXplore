@@ -71,8 +71,8 @@ To run **ChemGenXplore** locally, follow these steps:
 
 2. **Navigate to the Project Directory
    
-  ```bash
-  cd ChemGenXplore
+   ```bash
+   cd ChemGenXplore
 
 3. **Run the Application
 
