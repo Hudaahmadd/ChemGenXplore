@@ -58,7 +58,7 @@ ChemGenXplore includes three pre-integrated, publicly available *Escherichia col
 - Shiver et al., 2016: https://doi.org/10.1371/journal.pgen.1006124
 - Price et al., 2018: https://doi.org/10.1038/s41586-018-0124-0
 
-Users also have the flexibility to upload their own datasets for analysis.
+**Users also have the flexibility to upload their own datasets for analysis.**
 
 ## Acknowledgment
 
