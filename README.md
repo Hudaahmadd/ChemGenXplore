@@ -38,7 +38,7 @@ Chemical genomic screens are a valuable resource for uncovering gene functions a
   - Interact with heatmaps by zooming into specific regions.
 
 - **Upload Your Own Dataset**:
-  - Upload custom datasets formatted with genes as rows and conditions as columns. Example below:
+  - Upload custom datasets formatted with genes as rows and conditions as columns (CSV format). Example below:
     <p>
       <img src="www/example_dataset.png" alt="Logo" width="300">
     </p>
@@ -100,13 +100,8 @@ ChemGenXplore was developed with the support of The Banzhaf Lab and The Moradiga
 - Biosciences Institute, Faculty of Medical Sciences, Newcastle University, Newcastle upon Tyne, UK
 - Laboratory of Infectious Disease Epidemiology, KAUST Center of Excellence for Smart Health, Biological and Environmental Science and Engineering (BESE) Division, King Abdullah University of Science and Technology (KAUST), Thuwal, Saudi Arabia
 
-With gratitude, I acknowledge the funding provided by The Darwin Trust of Edinburgh for my PhD studies.
-
+This work is supported by The Darwin Trust of Edinburgh, which funds my PhD studies.
 
 ## Contact 
 
 For enquiries, please contact Huda Ahmad, Institute of Microbiology and Infection, School of Biosciences, University of Birmingham.
-
-
-
-
