@@ -49,15 +49,36 @@ Chemical genomic screens are a valuable resource for uncovering gene functions a
 
 ## How to Run the App
 
-1. Clone the repository:
+There are two ways to use **ChemGenXplore**: via the hosted Shiny application or by running it locally.
+
+### Option 1: Hosted Shiny Application
+
+The easiest way to use **ChemGenXplore** is through the hosted Shiny application. Access it directly at:
+
+[**ChemGenXplore Shiny App**](< https://hudaahmad.shinyapps.io/chemgenxplore/>)
+
+---
+
+### Option 2: Local 
+
+To run **ChemGenXplore** locally, follow these steps:
+
+1. **Clone the Repository**
+
+   Open your terminal and clone the repository using:
    ```bash
    git clone https://github.com/Hudaahmadd/ChemGenXplore.git
 
-2. Navigate to the project directory and open the R script:
+2. **Navigate to the Project Directory
+  ```bash
+  cd ChemGenXplore
+
+3. **Run the Application
+Launch the app by running the following command in your terminal:
   ```bash
   Rscript app.R
 
-The application will launch in your default web browser.
+Alternatively, you can open the app.R file in RStudio and click Run App.
 
 ## Data Sources
 ChemGenXplore includes three pre-integrated, publicly available *Escherichia coli* datasets from chemical genomic screens. These datasets provide fitness scores across a wide range of conditions and serve as the foundation for the analyses performed in ChemGenXplore:
