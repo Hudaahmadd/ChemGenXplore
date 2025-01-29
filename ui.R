@@ -53,7 +53,7 @@
             )
           )
         ),
-        
+          
         # Center the overview image below the title
         fluidRow(
           column(
