@@ -71,16 +71,16 @@ To run **ChemGenXplore** locally, follow these steps:
 
 2. **Navigate to the Project Directory**
 
-  Change into the project directory:
-   ```bash
-    cd ChemGenXplore
-   ```
+    Change into the project directory:
+     ```bash
+      cd ChemGenXplore
+     ```
 3. **Run the Application**
 
-  Launch the app by running the following command in your terminal:
-   ```bash
-    Rscript app.R
-   ```
+    Launch the app by running the following command in your terminal:
+     ```bash
+      Rscript app.R
+     ```
 Alternatively, you can open the app.R file in RStudio and click Run App.
 
 ## Data Sources
