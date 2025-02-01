@@ -33,7 +33,6 @@ Chemical genomic screens are a valuable resource for uncovering gene functions a
 - **Interactive Heatmaps**:
   - Generate hierarchical heatmaps for gene-condition phenotypic scores.
   - Customise clustering with multiple methods (Complete, Single, Average, Ward D) and distance metrics (Euclidean, Manhattan, Maximum, Canberra).
-  - Choose from multiple distance metrics (e.g., Euclidean, Manhattan) for clustering rows and columns.
   - Interact with heatmaps by zooming into specific regions.
 
 - **Upload Your Own Dataset**:
