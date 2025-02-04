@@ -149,7 +149,7 @@ server <- function(input, output, session) {
     # Render a selectInput UI element for condition selection
     selectInput(
       inputId = "conditions",  
-      label = "Select Conditions",  
+      label = "Select or Type Conditions:",  
       choices = c("All", conditions),  
       multiple = TRUE,  
       selected = conditions[1:12]  
@@ -993,7 +993,7 @@ output$condition_selector <- renderUI({
   # Generate a multi-select dropdown for selecting conditions
   selectInput(
     inputId = "conditions",  
-    label = "Select Conditions",  
+    label = "Select or Type Conditions:",  
     choices = c("All", conditions),  
     multiple = TRUE,  
     selected = conditions[1:15]  
@@ -2157,7 +2157,7 @@ output$downloadDendrogramPlot <- downloadHandler(
     # Create a dropdown menu for condition selection
     selectInput(
       inputId = "conditions",         
-      label = "Select Conditions",    
+      label = "Select or Type Conditions:",    
       choices = c("All", conditions), 
       multiple = TRUE,                
       selected = conditions[1:12]     
