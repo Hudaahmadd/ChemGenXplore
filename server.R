@@ -132,7 +132,7 @@ server <- function(input, output, session) {
     # Render a selectInput UI element for gene selection
     selectInput(
       inputId = "genes",  
-      label = "Select Genes",  # Label displayed above the dropdown
+      label = "Select or Type Genes:",  # Label displayed above the dropdown
       choices = c("All", genes),  # Add an "All" option at the top of the list
       multiple = TRUE,  # Allow multiple gene selections
       selected = genes[1:7]  # Default selection: the first 7 genes
@@ -978,7 +978,7 @@ output$gene_selector <- renderUI({
   # Generate a multi-select dropdown for selecting genes
   selectInput(
     inputId = "genes",  
-    label = "Select Genes",  
+    label = "Select or Type Genes:",  
     choices = c("All", genes),  # Include an "All" option followed by the list of genes
     multiple = TRUE,  
     selected = genes[1:7]  
@@ -2140,7 +2140,7 @@ output$downloadDendrogramPlot <- downloadHandler(
     # Create a dropdown menu for gene selection
     selectInput(
       inputId = "genes2",          
-      label = "Select Genes",     
+      label = "Select or Type Genes:",     
       choices = c("All", genes2), 
       multiple = TRUE,             
       selected = genes2[1:7]       
