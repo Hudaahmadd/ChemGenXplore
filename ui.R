@@ -252,7 +252,7 @@
                 style = "color: #34495E; font-weight: bold; margin-bottom: 15px; font-size: 18px;"
               ),
               p(
-                "For support or inquiries, please contact:",
+                "For questions or suggestions for additional features, please contact:",
                 style = "font-size: 16px; color: #2C3E50; margin-bottom: 10px;"
               ),
               p(
