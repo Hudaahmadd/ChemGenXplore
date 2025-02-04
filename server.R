@@ -177,7 +177,7 @@ server <- function(input, output, session) {
     DT::datatable(
       Genes_phenotypes(),  # Use the data from the Genes_phenotypes reactive function
       options = list(
-        pageLength = 15,  # Display 15 rows per page by default
+        pageLength = 10,  # Display 10 rows per page by default
         scrollX = TRUE    # Enable horizontal scrolling for wide tables
       ),
       rownames = FALSE  # Do not display row names in the table
@@ -318,7 +318,7 @@ server <- function(input, output, session) {
     DT::datatable(
       Conditions_phenotypes(),  
       options = list(
-        pageLength = 15,  
+        pageLength = 10,  
         scrollX = TRUE    
       ),
       rownames = FALSE  
@@ -356,7 +356,7 @@ server <- function(input, output, session) {
     DT::datatable(
       Conditions_phenotypes_sig(),  
       options = list(
-        pageLength = 15,  
+        pageLength = 10,  
         scrollX = TRUE    
       ),
       rownames = FALSE  
@@ -464,7 +464,7 @@ server <- function(input, output, session) {
     DT::datatable(
       all_gene_cor(),  
       options = list(
-        pageLength = 15,  
+        pageLength = 10,  
         scrollX = TRUE    
       ),
       rownames = FALSE  
@@ -588,7 +588,7 @@ output$conditions_correlations_filetable <- DT::renderDataTable({
   DT::datatable(
     all_cond_cor(),  
     options = list(
-      pageLength = 15,  
+      pageLength = 10,  
       scrollX = TRUE    
     ),
     rownames = FALSE  
@@ -714,7 +714,7 @@ output$filetableGO <- DT::renderDataTable({
   DT::datatable(
     all_go(),  
     options = list(
-      pageLength = 15,  
+      pageLength = 10,  
       scrollX = TRUE    
     ),
     rownames = FALSE  
@@ -848,7 +848,7 @@ output$filetableKEGG <- DT::renderDataTable({
   DT::datatable(
     all_kegg(),  
     options = list(
-      pageLength = 15,  
+      pageLength = 10,  
       scrollX = TRUE    
     ),
     rownames = FALSE  
@@ -1348,7 +1348,7 @@ output$downloadDendrogramPlot <- downloadHandler(
     DT::datatable(
       Genes_phenotypes_2(),                 
       options = list(                      
-        pageLength = 15,                  
+        pageLength = 10,                  
         scrollX = TRUE                     
       ),
       rownames = FALSE                      
@@ -1362,7 +1362,7 @@ output$downloadDendrogramPlot <- downloadHandler(
     DT::datatable(
       Conditions_phenotypes_2(),             
       options = list(                        
-        pageLength = 15,                  
+        pageLength = 10,                  
         scrollX = TRUE                  
       ),
       rownames = FALSE                       
@@ -1726,7 +1726,7 @@ output$downloadDendrogramPlot <- downloadHandler(
     DT::datatable(
       all_gene_cor_2(),  
       options = list(
-        pageLength = 15,    
+        pageLength = 10,    
         scrollX = TRUE    
       ),
       rownames = FALSE  
@@ -1987,7 +1987,7 @@ output$downloadDendrogramPlot <- downloadHandler(
     DT::datatable(
       cond_cor(),  
       options = list(
-        pageLength = 15,  
+        pageLength = 10,  
         scrollX = TRUE      
       ),
       rownames = FALSE  
