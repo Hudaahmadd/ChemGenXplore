@@ -484,7 +484,7 @@
                       sidebarPanel(
                         selectizeInput(
                           "Gene1", 
-                          "Select or Type a Gene:", 
+                          "Select or Type Genes:", 
                           choices = NULL,  # Populate with all available genes
                           multiple = TRUE
                         ),
@@ -528,7 +528,7 @@
                         
                         selectizeInput(
                           "cond1", 
-                          "Select or Type a Condition:", 
+                          "Select or Type Conditions:", 
                           choices = NULL, 
                           multiple = TRUE
                         ),
@@ -577,7 +577,7 @@
                              sidebarPanel(
                                selectizeInput(
                                  "Gene2", 
-                                 "Select or Type a Gene:",
+                                 "Select or Type Genes:",
                                  choices = NULL, 
                                  multiple = TRUE
                                ),
@@ -610,7 +610,7 @@
                              sidebarPanel(
                                selectInput(
                                  "cond2", 
-                                 "Select or Type a Condition:", 
+                                 "Select or Type Conditions:", 
                                  choices = NULL,
                                  multiple = TRUE),
                                sliderInput("FDRq3", "% FDR for conditions correlations (qvals)", min = 0, max = 100, step = 0.1, value = 5),
@@ -644,7 +644,7 @@
                   tabPanel("GO Enrichment",
                            sidebarLayout(
                              sidebarPanel(
-                               selectInput("Gene3", "Select or Type a Gene:", choices = NULL, multiple = TRUE),
+                               selectInput("Gene3", "Select or Type Genes:", choices = NULL, multiple = TRUE),
                                sliderInput("FDRq4", "FDR for GO enrichment (qvals)", min = 0, max = 100, step = 0.1, value = 100),
                                width = 3
                              ),
@@ -668,7 +668,7 @@
                   tabPanel("KEGG Enrichment",
                            sidebarLayout(
                              sidebarPanel(
-                               selectInput("Gene4", "Select or Type a Gene:", choices = NULL, multiple = TRUE),
+                               selectInput("Gene4", "Select or Type Genes:", choices = NULL, multiple = TRUE),
                                sliderInput("FDRq5", "FDR for KEGG enrichment (qvals)", min = 0, max = 100, step = 0.1, value = 100),
                                width = 3
                              ),
@@ -785,7 +785,7 @@
                       sidebarPanel(
                         selectizeInput(
                           "Gene5", 
-                          "Select or Type a Gene:", 
+                          "Select or Type Genes:", 
                           choices = NULL,  # Populate with all available genes
                           multiple = TRUE
                         ),
@@ -826,7 +826,7 @@
                       sidebarPanel(
                         selectizeInput(
                           "Condition1", 
-                          "Select or Type a Condition:", 
+                          "Select or Type Conditions:", 
                           choices = NULL,  # Populate with all available conditions
                           multiple = TRUE
                         ),
@@ -876,7 +876,7 @@
                         uiOutput("run_correlation_ui"),  # Action button 
                         selectizeInput(
                           "Gene6",
-                          "Select or Type a Gene:",
+                          "Select or Type Genes:",
                           choices = NULL,  # Dynamically populated
                           multiple = TRUE
                         ),
@@ -917,7 +917,7 @@
                       sidebarPanel(
                         selectizeInput(
                           "Condition2",
-                          "Select or Type a Condition:",
+                          "Select or Type Conditions:",
                           choices = NULL,  # Dynamically populated
                           multiple = TRUE
                         ),
