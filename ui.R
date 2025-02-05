@@ -438,7 +438,7 @@
                   ),
                   tags$ul(
                     tags$li("Navigate to 'Upload Your Dataset'."),
-                    tags$li("Upload a CSV file where rows represent genes/mutants and columns represent conditions."),
+                    tags$li("Upload a CSV file where rows contain unique identifiers (e.g., genes, samples, strains) and columns contain experimental measurements (e.g., fitness scores, gene expression levels, growth rates)."),
                     tags$li("Follow the same steps for phenotypes, correlation analysis, enrichment analysis, and heatmap generation as the E. coli tab.")
                   )
                 ),
@@ -763,7 +763,7 @@
               width = "25%"
             ),
             
-            tags$p("Please upload a CSV file where rows represent genes/mutants, and columns represent conditions. Example Dataset Below:"),
+            tags$p("Upload a CSV file where rows contain unique identifiers (e.g., genes, samples, strains) and columns contain experimental measurements (e.g., fitness scores, gene expression levels, growth rates). Example Dataset Below:"),
             tags$img(
               src = paste0("data:image/png;base64,", encoded_example_dataset),
               alt = "Example dataset format",
