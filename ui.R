@@ -236,7 +236,7 @@
                 style = "font-size: 14px; color: #2C3E50; margin-bottom: 5px;"
               ),
               p(
-                "KAUST Computational Bioscience Research Centre, King Abdullah University of Science and Technology, Thuwal, Makkah, Saudi Arabia",
+                "Laboratory of Infectious Disease Epidemiology, Biological and Environmental Science and Engineering (BESE) Division, King Abdullah University of Science and Technology (KAUST), Thuwal, Saudi Arabia",
                 style = "font-size: 14px; color: #2C3E50; margin-bottom: 20px;"
               ),
               p(
