@@ -36,7 +36,7 @@ Chemical genomic screens are a valuable resource for uncovering gene functions a
   - Interact with heatmaps by zooming into specific regions.
 
 - **Upload Your Own Dataset**:
-  - Upload custom datasets formatted with genes as rows and conditions as columns (CSV format). Example below:
+  - Upload a CSV file where rows contain unique identifiers (e.g., genes, samples, strains) and columns contain experimental measurements (e.g., fitness scores, gene expression       levels, growth rates). Example Dataset Below:
     <p>
       <img src="www/example_dataset.png" alt="Logo" width="300">
     </p>
