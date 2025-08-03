@@ -1,39 +1,40 @@
-  # The UI is structured using a dashboard layout with three primary components:
-  # 1. Header
-  # 2. Sidebar
-  # 3. Body 
+# The UI is structured using a dashboard layout with three primary components:
+# 1. Header
+# 2. Sidebar
+# 3. Body 
+
+ui <- dashboardPage(
+  title = "ChemGenXplore",  # ✅ this sets the browser tab title
+  # Dashboard Header: Displays the application title
+  dashboardHeader(
+    title = span("By Banzhaf & Moradigaravand Labs", style = "font-weight: bold; color: #FFFFFF; font-size: 15px;"), # Title with custom styling
+    titleWidth = 300 # Fixed width for the header
+  ),
   
-  ui <- dashboardPage(
-    # Dashboard Header: Displays the application title
-    dashboardHeader(
-        title = span("By Banzhaf & Moradigaravand Labs", style = "font-weight: bold; color: #FFFFFF; font-size: 15px;"), # Title with custom styling
-        titleWidth = 300 # Fixed width for the header
+  # Dashboard Sidebar: Contains the navigation menu
+  dashboardSidebar(
+    width = 300,
+    sidebarMenu(
+      menuItem("Home", tabName = "home", icon = icon("home")),
+      menuItem("About", tabName = "about", icon = icon("info-circle")),
+      menuItem("User Guide", tabName = "user_guide", icon = icon("book")),
+      menuItem("E. coli", tabName = "ecoli", icon = icon("bacteria")),
+      menuItem("Upload Your Dataset", tabName = "upload_your_dataset", icon = icon("upload"))
+    )
+  ),
+  
+  # Dashboard Body: Includes custom styling and dynamic content placeholders
+  dashboardBody(
+    tags$head(
+      tags$link(rel = "stylesheet", type = "text/css", href = "custom.css"), # Your custom CSS
+      tags$link(
+        href = "https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&display=swap",
+        rel = "stylesheet"
+      ), # Google Fonts link
+      tags$meta(name = "viewport", content = "width=device-width, initial-scale=1") # Responsive meta tag
     ),
     
-    # Dashboard Sidebar: Contains the navigation menu
-    dashboardSidebar(
-      width = 300,
-      sidebarMenu(
-        menuItem("Home", tabName = "home", icon = icon("home")),
-        menuItem("About", tabName = "about", icon = icon("info-circle")),
-        menuItem("User Guide", tabName = "user_guide", icon = icon("book")),
-        menuItem("E. coli", tabName = "ecoli", icon = icon("bacteria")),
-        menuItem("Upload Your Dataset", tabName = "upload_your_dataset", icon = icon("upload"))
-      )
-    ),
-  
-    # Dashboard Body: Includes custom styling and dynamic content placeholders
-    dashboardBody(
-      tags$head(
-        tags$link(rel = "stylesheet", type = "text/css", href = "custom.css"), # Your custom CSS
-        tags$link(
-          href = "https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&display=swap",
-          rel = "stylesheet"
-        ), # Google Fonts link
-        tags$meta(name = "viewport", content = "width=device-width, initial-scale=1") # Responsive meta tag
-      ),
-      
-      
+    
     tabItems(
       # Home tab content
       tabItem(
@@ -53,7 +54,7 @@
             )
           )
         ),
-          
+        
         # Center the overview image below the title
         fluidRow(
           column(
@@ -66,7 +67,7 @@
         ),       
         # Add space between the image and features
         br(),
-
+        
         
         # Key Features Header
         fluidRow(
@@ -236,7 +237,7 @@
                 style = "font-size: 14px; color: #2C3E50; margin-bottom: 5px;"
               ),
               p(
-                "Laboratory of Infectious Disease Epidemiology, Biological and Environmental Science and Engineering (BESE) Division, King Abdullah University of Science and Technology (KAUST), Thuwal, Saudi Arabia",
+                "Laboratory of Infectious Disease Epidemiology, KAUST Center of Excellence for Smart Health and Biological and Environmental Science and Engineering (BESE) Division, King Abdullah University of Science and Technology (KAUST), Thuwal, Saudi Arabia",
                 style = "font-size: 14px; color: #2C3E50; margin-bottom: 20px;"
               ),
               p(
@@ -980,7 +981,7 @@
                     downloadButton("downloadHeatmapData2", "Download Heatmap Data"),
                     downloadButton("downloadInteractiveHeatmapPlot2", "Download Interactive Heatmap Plot"),
                     downloadButton("downloadDendrogramPlot2", "Download Dendrogram Plot")
-                    ),
+                  ),
                   
                   mainPanel(
                     # Add tabs for heatmap visualizations

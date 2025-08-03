@@ -10,7 +10,7 @@ server <- function(input, output, session) {
   go_file <- readRDS("3_go_enrich.rds")          # Gene Ontology (GO) enrichment data
   kegg_file <- readRDS("3_kegg_enrich.rds")      # KEGG pathway enrichment data
   
-
+  
   # Load heatmap matrices for datasets from three published studies:
   heatmap_datasets <- list(
     "Nichols, R. et al." = readRDS("nichols_heatmap.rds"),
@@ -18,7 +18,7 @@ server <- function(input, output, session) {
     "Price, MN. et al." = readRDS("price_heatmap.rds")
   )
   
-
+  
   # Observe block to ensure datasets are loaded before proceeding
   observe({
     req(scores_file, gene_cor_file, cond_cor_file, go_file, kegg_file)
@@ -97,7 +97,7 @@ server <- function(input, output, session) {
       ),
       server = TRUE  
     )
-  
+    
     # Extract unique genes from the Gene column in the KEGG file
     unique_genes_kegg <- unique(kegg_file$Gene)  
     
@@ -115,7 +115,7 @@ server <- function(input, output, session) {
     )
     
   })
-
+  
   # Create a reactive function to return the selected heatmap dataset
   selected_heatmap_data <- reactive({
     req(input$selected_dataset)  # Ensure the user has selected a dataset from the dropdown or input field
@@ -200,7 +200,7 @@ server <- function(input, output, session) {
       )
     }
   )
-
+  
   # Reactive function for filtering significant phenotypes
   Genes_phenotypes_sig <- reactive({
     Genes_phenotypes() %>%  # Start with the data from the Genes_phenotypes reactive function
@@ -296,7 +296,7 @@ server <- function(input, output, session) {
       )
     }
   )
-
+  
   #### Server logic for Phenotypes Conditions #####
   
   # Condition-Level Tab: Filter by selected condition
@@ -551,596 +551,612 @@ server <- function(input, output, session) {
   })
   
   # Render the interactive plot of significant gene correlations
-output$barplot <- renderPlotly({
-  ggplotly(plotInputcor())  
-})
-
-# Download handler for the gene correlations plot
-output$downloadcorplot <- downloadHandler(
-  # Define the filename dynamically based on the selected gene(s)
-  filename = function() { 
-    paste(input$Gene2, 'Genes_Correlation.pdf', sep = '_')  
-  },
+  output$barplot <- renderPlotly({
+    ggplotly(plotInputcor())  
+  })
   
-  # Define the content of the file to be downloaded
-  content = function(file) {
-    ggsave(
-      file,               
-      plotInputcor(),    
-      width = 8,          
-      height = 5          
-    )
-  }
-)
-
-# Reactive function for all condition correlations
-all_cond_cor <- reactive({
-  # Filter the condition correlation dataset to include rows where Condition_1 matches the selected condition(s)
-  dplyr::filter(
-    cond_cor_file,  
-    Condition_1 %in% input$cond2  
+  # Download handler for the gene correlations plot
+  output$downloadcorplot <- downloadHandler(
+    # Define the filename dynamically based on the selected gene(s)
+    filename = function() { 
+      paste(input$Gene2, 'Genes_Correlation.pdf', sep = '_')  
+    },
+    
+    # Define the content of the file to be downloaded
+    content = function(file) {
+      ggsave(
+        file,               
+        plotInputcor(),    
+        width = 8,          
+        height = 5          
+      )
+    }
   )
-})
-
-# Render the "All Correlations" table for conditions
-output$conditions_correlations_filetable <- DT::renderDataTable({
-  # Create a DataTable using the filtered condition correlations dataset
-  DT::datatable(
-    all_cond_cor(),  
-    options = list(
-      pageLength = 10,  
-      scrollX = TRUE    
-    ),
-    rownames = FALSE  
-  )
-})
   
-# Download handler for the "All Correlations" table for conditions
-output$downloadAllCondCorrelations <- downloadHandler(
-  # Define the filename dynamically with the current date
-  filename = function() {
-    paste("All_Correlations_", Sys.Date(), ".csv", sep = "")  
-  },
-  
-  # Define the content of the file to be downloaded
-  content = function(file) {
-    write.csv(
-      all_cond_cor(),  
-      file,            
-      row.names = FALSE  
-    )
-  }
-)
-  
-# Reactive function to filter condition correlations based on the FDR threshold
-condsig <- reactive({
-  all_cond_cor() %>%  
+  # Reactive function for all condition correlations
+  all_cond_cor <- reactive({
+    # Filter the condition correlation dataset to include rows where Condition_1 matches the selected condition(s)
     dplyr::filter(
-      as.numeric(qval) <= (input$FDRq3 / 100)  
+      cond_cor_file,  
+      Condition_1 %in% input$cond2  
     )
-})
+  })
   
-# Render the data table of significant condition correlations
-output$conditions_correlations_sig_filetable <- DT::renderDataTable({
-  # Create a DataTable using the filtered significant correlations dataset
-  DT::datatable(
-    condsig(),  
-    options = list(
-      pageLength = 5, 
-      scrollX = TRUE   
-    ),
-    rownames = FALSE  
+  # Render the "All Correlations" table for conditions
+  output$conditions_correlations_filetable <- DT::renderDataTable({
+    # Create a DataTable using the filtered condition correlations dataset
+    DT::datatable(
+      all_cond_cor(),  
+      options = list(
+        pageLength = 10,  
+        scrollX = TRUE    
+      ),
+      rownames = FALSE  
+    )
+  })
+  
+  # Download handler for the "All Correlations" table for conditions
+  output$downloadAllCondCorrelations <- downloadHandler(
+    # Define the filename dynamically with the current date
+    filename = function() {
+      paste("All_Correlations_", Sys.Date(), ".csv", sep = "")  
+    },
+    
+    # Define the content of the file to be downloaded
+    content = function(file) {
+      write.csv(
+        all_cond_cor(),  
+        file,            
+        row.names = FALSE  
+      )
+    }
   )
-})
-
-# Download handler for significant condition correlations data
-output$download_cond_cor <- downloadHandler(
-  # Define the filename for the downloaded file
-  filename = function() {
-    paste("Conditions_Correlation_", Sys.Date(), ".csv", sep = "")
-  },
   
-  # Define the content of the file to be downloaded
-  content = function(fname) {
-    write.csv(
-      condsig(),    
-      fname,         
-      row.names = FALSE  
+  # Reactive function to filter condition correlations based on the FDR threshold
+  condsig <- reactive({
+    all_cond_cor() %>%  
+      dplyr::filter(
+        as.numeric(qval) <= (input$FDRq3 / 100)  
+      )
+  })
+  
+  # Render the data table of significant condition correlations
+  output$conditions_correlations_sig_filetable <- DT::renderDataTable({
+    # Create a DataTable using the filtered significant correlations dataset
+    DT::datatable(
+      condsig(),  
+      options = list(
+        pageLength = 5, 
+        scrollX = TRUE   
+      ),
+      rownames = FALSE  
     )
-  }
-)
+  })
   
-# Reactive function to plot significant condition correlations
-plotInputcor_cond <- reactive({
-  ggplot(
-    condsig(),  
-    aes(y = Dataset, fill = Correlation)  
-  ) +
-    geom_bar(stat = "count") +  
-    scale_fill_manual(
-      values = c("Positive" = "#756bb1", "Negative" = "#dadaeb")  
+  # Download handler for significant condition correlations data
+  output$download_cond_cor <- downloadHandler(
+    # Define the filename for the downloaded file
+    filename = function() {
+      paste("Conditions_Correlation_", Sys.Date(), ".csv", sep = "")
+    },
+    
+    # Define the content of the file to be downloaded
+    content = function(fname) {
+      write.csv(
+        condsig(),    
+        fname,         
+        row.names = FALSE  
+      )
+    }
+  )
+  
+  # Reactive function to plot significant condition correlations
+  plotInputcor_cond <- reactive({
+    ggplot(
+      condsig(),  
+      aes(y = Dataset, fill = Correlation)  
     ) +
-    ylab("") +  # Remove the y-axis label for a cleaner appearance
-    xlab("Count of Pearson r values > 0.4 or < -0.4") + 
-    theme_classic() +  
-    theme(
-      axis.text.x = element_text(size = 10),  
-      axis.text.y = element_text(size = 10),  
-      legend.text = element_text(size = 10),  
-      legend.title = element_text(size = 11),  
-      axis.title.x = element_text(size = 11),  
-      plot.title = element_text(size = 16, face = "bold")  
-    )
-})
-
-# Render the plot of significant condition correlations as an interactive plot
-output$barplot2 <- renderPlotly({
-  ggplotly(plotInputcor_cond())  
-})
-
+      geom_bar(stat = "count") +  
+      scale_fill_manual(
+        values = c("Positive" = "#756bb1", "Negative" = "#dadaeb")  
+      ) +
+      ylab("") +  # Remove the y-axis label for a cleaner appearance
+      xlab("Count of Pearson r values > 0.4 or < -0.4") + 
+      theme_classic() +  
+      theme(
+        axis.text.x = element_text(size = 10),  
+        axis.text.y = element_text(size = 10),  
+        legend.text = element_text(size = 10),  
+        legend.title = element_text(size = 11),  
+        axis.title.x = element_text(size = 11),  
+        plot.title = element_text(size = 16, face = "bold")  
+      )
+  })
   
-# Download handler for the condition correlations plot
-output$downloadcorplot2 <- downloadHandler(
-  # Define the filename dynamically based on the selected condition(s)
-  filename = function() { 
-    paste(input$cond2, 'Conditions_Correlation.pdf', sep = '_')  
-  },
+  # Render the plot of significant condition correlations as an interactive plot
+  output$barplot2 <- renderPlotly({
+    ggplotly(plotInputcor_cond())  
+  })
   
-  # Define the content of the file to be downloaded
-  content = function(file) {
-    ggsave(
-      file,               
-      plotInputcor_cond(), 
-      width = 8,          
-      height = 5         
-    )
-  }
-)
-
-#### Server logic for GO Enrichment ####
-
-# Reactive function to filter GO enrichment data based on selected genes
-all_go <- reactive({
-  # Filter the GO enrichment dataset to include rows where the Gene matches the selected gene(s)
-  dplyr::filter(
-    go_file,  
-    Gene %in% input$Gene3  
+  
+  # Download handler for the condition correlations plot
+  output$downloadcorplot2 <- downloadHandler(
+    # Define the filename dynamically based on the selected condition(s)
+    filename = function() { 
+      paste(input$cond2, 'Conditions_Correlation.pdf', sep = '_')  
+    },
+    
+    # Define the content of the file to be downloaded
+    content = function(file) {
+      ggsave(
+        file,               
+        plotInputcor_cond(), 
+        width = 8,          
+        height = 5         
+      )
+    }
   )
-})
-
-# Render the "All GO Enrichment" table
-output$filetableGO <- DT::renderDataTable({
-  # Create a DataTable using the filtered GO enrichment dataset
-  DT::datatable(
-    all_go(),  
-    options = list(
-      pageLength = 10,  
-      scrollX = TRUE    
-    ),
-    rownames = FALSE  
+  
+  #### Server logic for GO Enrichment ####
+  
+  # Reactive function to filter GO enrichment data based on selected genes
+  all_go <- reactive({
+    # Filter the GO enrichment dataset to include rows where the Gene matches the selected gene(s)
+    dplyr::filter(
+      go_file,  
+      Gene %in% input$Gene3  
+    )
+  })
+  
+  # Render the "All GO Enrichment" table
+  output$filetableGO <- DT::renderDataTable({
+    # Create a DataTable using the filtered GO enrichment dataset
+    DT::datatable(
+      all_go(),  
+      options = list(
+        pageLength = 10,  
+        scrollX = TRUE    
+      ),
+      rownames = FALSE  
+    )
+  })
+  
+  # Download handler for the "All GO Enrichment" table
+  output$downloadgo <- downloadHandler(
+    # Define the filename dynamically with the current date
+    filename = function() { 
+      paste("All_GO_Enrichment_", Sys.Date(), ".csv", sep = "")  
+    },
+    
+    # Define the content of the file to be downloaded
+    content = function(file) {
+      write.csv(
+        all_go(),       
+        file,           
+        row.names = FALSE  
+      )
+    }
   )
-})
-
-# Download handler for the "All GO Enrichment" table
-output$downloadgo <- downloadHandler(
-  # Define the filename dynamically with the current date
-  filename = function() { 
-    paste("All_GO_Enrichment_", Sys.Date(), ".csv", sep = "")  
-  },
   
-  # Define the content of the file to be downloaded
-  content = function(file) {
-    write.csv(
-      all_go(),       
-      file,           
-      row.names = FALSE  
+  # Reactive function to filter significant GO terms based on FDR threshold
+  sig_go <- reactive({
+    dplyr::filter(
+      all_go(),  
+      qvalue <= (input$FDRq4 / 100)  
     )
-  }
-)
-
-# Reactive function to filter significant GO terms based on FDR threshold
-sig_go <- reactive({
-  dplyr::filter(
-    all_go(),  
-    qvalue <= (input$FDRq4 / 100)  
+  })
+  
+  # Render the data table of significant GO enrichment
+  output$filetableGOs <- DT::renderDataTable({
+    # Create a DataTable using the filtered significant GO enrichment dataset
+    DT::datatable(
+      sig_go(),  
+      options = list(
+        pageLength = 5,  
+        scrollX = TRUE   
+      ),
+      rownames = FALSE  
+    )
+  })
+  
+  # Download handler for significant GO enrichment data
+  output$downloadgos <- downloadHandler(
+    # Define the filename for the downloaded file
+    filename = function() { 
+      "GO_enrichment.csv" 
+    },
+    
+    # Define the content of the file to be downloaded
+    content = function(fname) {
+      write.csv(
+        sig_go(),       
+        fname,         
+        row.names = FALSE  
+      )
+    }
   )
-})
   
-# Render the data table of significant GO enrichment
-output$filetableGOs <- DT::renderDataTable({
-  # Create a DataTable using the filtered significant GO enrichment dataset
-  DT::datatable(
-    sig_go(),  
-    options = list(
-      pageLength = 5,  
-      scrollX = TRUE   
-    ),
-    rownames = FALSE  
+  # Reactive function to generate a plot for significant GO enrichment
+  plotInputGO <- reactive({
+    sig_go() %>%  
+      group_by(Description) %>%  # Group by the GO term description
+      summarise(
+        Count = sum(Count),  # Summarize by summing the counts for each GO term
+        .groups = "drop"  # Remove grouping after summarisation
+      ) %>%
+      mutate(
+        # Extract the part of the Description before the first comma
+        Description = str_extract(Description, "^[^,]+"),
+        # Reorder Description by Count for better plotting
+        Description = fct_reorder(Description, Count)
+      ) %>%
+      ggplot(aes(x = Description, y = Count, fill = Description)) +  
+      geom_bar(stat = "identity", width = 0.8) +  # Create a horizontal bar plot
+      coord_flip() +  # Flip the axes for better readability of GO term names
+      ylab("Count of Genes") +  # Set the y-axis label
+      xlab("") +  # Leave the x-axis label blank
+      scale_fill_manual(
+        values = colorRampPalette(RColorBrewer::brewer.pal(8, "Set3"))(n_distinct(sig_go()$Description))  # Dynamic colors for each GO term
+      ) +
+      theme_classic() +  
+      theme(
+        axis.text.x = element_text(size = 10), 
+        axis.text.y = element_text(size = 10), 
+        axis.title.y = element_text(size = 11), 
+        plot.title = element_blank(),  
+        legend.position = "none"  
+      )
+  })
+  
+  # Render the interactive plot for GO enrichment
+  output$barplotGO <- renderPlotly({
+    ggplotly(plotInputGO())  
+  })
+  
+  # Download handler for GO enrichment plot
+  output$downloadgoplot <- downloadHandler(
+    # Define the filename dynamically based on the selected gene(s)
+    filename = function() { 
+      paste(input$Gene3, 'GO_enrichment.pdf', sep = '_')  
+    },
+    
+    # Define the content of the file to be downloaded
+    content = function(file) {
+      ggsave(
+        file,               
+        plotInputGO(),      
+        width = 12,         
+        height = 5         
+      )
+    }
   )
-})
   
-# Download handler for significant GO enrichment data
-output$downloadgos <- downloadHandler(
-  # Define the filename for the downloaded file
-  filename = function() { 
-    "GO_enrichment.csv" 
-  },
+  #### Server logic for KEGG Enrichment ####
   
-  # Define the content of the file to be downloaded
-  content = function(fname) {
-    write.csv(
-      sig_go(),       
-      fname,         
-      row.names = FALSE  
+  # Reactive function to filter KEGG enrichment data based on selected genes
+  all_kegg <- reactive({
+    # Filter the KEGG enrichment dataset to include rows where the Gene matches the selected gene(s)
+    dplyr::filter(
+      kegg_file,  
+      Gene %in% input$Gene4  
     )
-  }
-)
-
-# Reactive function to generate a plot for significant GO enrichment
-plotInputGO <- reactive({
-  sig_go() %>%  
-    group_by(Description) %>%  # Group by the GO term description
-    summarise(
-      Count = sum(Count),  # Summarize by summing the counts for each GO term
-      .groups = "drop"  # Remove grouping after summarisation
-    ) %>%
-    mutate(
-      # Extract the part of the Description before the first comma
-      Description = str_extract(Description, "^[^,]+"),
-      # Reorder Description by Count for better plotting
-      Description = fct_reorder(Description, Count)
-    ) %>%
-    ggplot(aes(x = Description, y = Count, fill = Description)) +  
-    geom_bar(stat = "identity", width = 0.8) +  # Create a horizontal bar plot
-    coord_flip() +  # Flip the axes for better readability of GO term names
-    ylab("Count of Genes") +  # Set the y-axis label
-    xlab("") +  # Leave the x-axis label blank
-    scale_fill_manual(
-      values = colorRampPalette(RColorBrewer::brewer.pal(8, "Set3"))(n_distinct(sig_go()$Description))  # Dynamic colors for each GO term
-    ) +
-    theme_classic() +  
-    theme(
-      axis.text.x = element_text(size = 10), 
-      axis.text.y = element_text(size = 10), 
-      axis.title.y = element_text(size = 11), 
-      plot.title = element_blank(),  
-      legend.position = "none"  
+  })
+  
+  # Render the "All KEGG Enrichment" table
+  output$filetableKEGG <- DT::renderDataTable({
+    # Create a DataTable using the filtered KEGG enrichment dataset
+    DT::datatable(
+      all_kegg(),  
+      options = list(
+        pageLength = 10,  
+        scrollX = TRUE    
+      ),
+      rownames = FALSE  
     )
-})
+  })
   
-# Render the interactive plot for GO enrichment
-output$barplotGO <- renderPlotly({
-  ggplotly(plotInputGO())  
-})
-
-# Download handler for GO enrichment plot
-output$downloadgoplot <- downloadHandler(
-  # Define the filename dynamically based on the selected gene(s)
-  filename = function() { 
-    paste(input$Gene3, 'GO_enrichment.pdf', sep = '_')  
-  },
-  
-  # Define the content of the file to be downloaded
-  content = function(file) {
-    ggsave(
-      file,               
-      plotInputGO(),      
-      width = 12,         
-      height = 5         
-    )
-  }
-)
-
-#### Server logic for KEGG Enrichment ####
-  
-# Reactive function to filter KEGG enrichment data based on selected genes
-all_kegg <- reactive({
-  # Filter the KEGG enrichment dataset to include rows where the Gene matches the selected gene(s)
-  dplyr::filter(
-    kegg_file,  
-    Gene %in% input$Gene4  
+  # Download handler for the "All KEGG Enrichment" table
+  output$downloadkegg <- downloadHandler(
+    # Define the filename dynamically with the current date
+    filename = function() { 
+      paste("All_KEGG_Enrichment_", Sys.Date(), ".csv", sep = "") 
+    },
+    
+    # Define the content of the file to be downloaded
+    content = function(file) {
+      write.csv(
+        all_kegg(),       
+        file,            
+        row.names = FALSE  
+      )
+    }
   )
-})
-
-# Render the "All KEGG Enrichment" table
-output$filetableKEGG <- DT::renderDataTable({
-  # Create a DataTable using the filtered KEGG enrichment dataset
-  DT::datatable(
-    all_kegg(),  
-    options = list(
-      pageLength = 10,  
-      scrollX = TRUE    
-    ),
-    rownames = FALSE  
+  
+  # Reactive function to filter significant KEGG terms based on the FDR threshold
+  sig_kegg <- reactive({
+    dplyr::filter(
+      all_kegg(), 
+      qvalue <= (input$FDRq5 / 100) 
+    )
+  })
+  
+  # Render the data table of significant KEGG enrichment
+  output$filetableKEGGs <- DT::renderDataTable({
+    # Create a DataTable using the filtered significant KEGG enrichment dataset
+    DT::datatable(
+      sig_kegg(),  
+      options = list(
+        pageLength = 5,  
+        scrollX = TRUE   
+      ),
+      rownames = FALSE  
+    )
+  })
+  
+  # Download handler for significant KEGG enrichment data
+  output$downloadkeggs <- downloadHandler(
+    # Define the filename for the downloaded file
+    filename = function() {
+      paste("KEGG_enrichment_", Sys.Date(), ".csv", sep = "")
+    },
+    
+    # Define the content of the file to be downloaded
+    content = function(fname) {
+      write.csv(
+        sig_kegg(),       
+        fname,            
+        row.names = FALSE  
+      )
+    }
   )
-})
-
-# Download handler for the "All KEGG Enrichment" table
-output$downloadkegg <- downloadHandler(
-  # Define the filename dynamically with the current date
-  filename = function() { 
-    paste("All_KEGG_Enrichment_", Sys.Date(), ".csv", sep = "") 
-  },
   
-  # Define the content of the file to be downloaded
-  content = function(file) {
-    write.csv(
-      all_kegg(),       
-      file,            
-      row.names = FALSE  
-    )
-  }
-)
-
-# Reactive function to filter significant KEGG terms based on the FDR threshold
-sig_kegg <- reactive({
-  dplyr::filter(
-    all_kegg(), 
-    qvalue <= (input$FDRq5 / 100) 
+  # Reactive function to generate a plot for significant KEGG enrichment
+  plotInputKEGG <- reactive({
+    sig_kegg() %>%  
+      group_by(Description) %>%  
+      summarise(
+        Count = sum(Count),  
+        .groups = "drop"  
+      ) %>%
+      mutate(
+        Description = fct_reorder(Description, Count)  
+      ) %>%
+      ggplot(aes(x = Description, y = Count, fill = Description)) +  
+      geom_bar(stat = "identity", width = 0.8) +  
+      coord_flip() +  
+      ylab("Count of Genes") + 
+      xlab("") +  
+      scale_fill_manual(
+        values = colorRampPalette(RColorBrewer::brewer.pal(8, "Set3"))(nrow(sig_kegg()))  
+      ) +
+      theme_classic() +  
+      theme(
+        axis.text.x = element_text(size = 10),  
+        axis.text.y = element_text(size = 10),  
+        axis.title.y = element_text(size = 11),  
+        plot.title = element_blank(),  
+        legend.position = "none"  
+      )
+  })
+  
+  # Render the interactive plot for KEGG enrichment
+  output$barplotKEGG <- renderPlotly({
+    ggplotly(plotInputKEGG())  
+  })
+  
+  # Download handler for KEGG enrichment plot
+  output$downloadkeggplot <- downloadHandler(
+    # Define the filename dynamically based on the selected gene(s)
+    filename = function() { 
+      paste(input$Gene4, 'KEGG_enrichment.pdf', sep = '_')  
+    },
+    
+    # Define the content of the file to be downloaded
+    content = function(file) {
+      ggsave(
+        file,              
+        plotInputKEGG(),   
+        width = 12,        
+        height = 5          
+      )
+    }
   )
-})
-  
-# Render the data table of significant KEGG enrichment
-output$filetableKEGGs <- DT::renderDataTable({
-  # Create a DataTable using the filtered significant KEGG enrichment dataset
-  DT::datatable(
-    sig_kegg(),  
-    options = list(
-      pageLength = 5,  
-      scrollX = TRUE   
-    ),
-    rownames = FALSE  
-  )
-})
-  
-# Download handler for significant KEGG enrichment data
-output$downloadkeggs <- downloadHandler(
-  # Define the filename for the downloaded file
-  filename = function() {
-    paste("KEGG_enrichment_", Sys.Date(), ".csv", sep = "")
-  },
-  
-  # Define the content of the file to be downloaded
-  content = function(fname) {
-    write.csv(
-      sig_kegg(),       
-      fname,            
-      row.names = FALSE  
-    )
-  }
-)
-  
-# Reactive function to generate a plot for significant KEGG enrichment
-plotInputKEGG <- reactive({
-  sig_kegg() %>%  
-    group_by(Description) %>%  
-    summarise(
-      Count = sum(Count),  
-      .groups = "drop"  
-    ) %>%
-    mutate(
-      Description = fct_reorder(Description, Count)  
-    ) %>%
-    ggplot(aes(x = Description, y = Count, fill = Description)) +  
-    geom_bar(stat = "identity", width = 0.8) +  
-    coord_flip() +  
-    ylab("Count of Genes") + 
-    xlab("") +  
-    scale_fill_manual(
-      values = colorRampPalette(RColorBrewer::brewer.pal(8, "Set3"))(nrow(sig_kegg()))  
-    ) +
-    theme_classic() +  
-    theme(
-      axis.text.x = element_text(size = 10),  
-      axis.text.y = element_text(size = 10),  
-      axis.title.y = element_text(size = 11),  
-      plot.title = element_blank(),  
-      legend.position = "none"  
-    )
-})
-
-# Render the interactive plot for KEGG enrichment
-output$barplotKEGG <- renderPlotly({
-  ggplotly(plotInputKEGG())  
-})
-
-# Download handler for KEGG enrichment plot
-output$downloadkeggplot <- downloadHandler(
-  # Define the filename dynamically based on the selected gene(s)
-  filename = function() { 
-    paste(input$Gene4, 'KEGG_enrichment.pdf', sep = '_')  
-  },
-  
-  # Define the content of the file to be downloaded
-  content = function(file) {
-    ggsave(
-      file,              
-      plotInputKEGG(),   
-      width = 12,        
-      height = 5          
-    )
-  }
-)
   
   #### Server logic for Heatmaps ####
   
-# Reactive function to retrieve the selected heatmap dataset
-selected_heatmap_data <- reactive({
-  req(input$selected_dataset)  
-  heatmap_datasets[[input$selected_dataset]]  # Retrieve the dataset corresponding to the selected option
-})
+  # Reactive function to retrieve the selected heatmap dataset
+  selected_heatmap_data <- reactive({
+    req(input$selected_dataset)  
+    heatmap_datasets[[input$selected_dataset]]  # Retrieve the dataset corresponding to the selected option
+  })
   
-# Render the UI for selecting genes based on the selected heatmap dataset
-output$gene_selector <- renderUI({
-  req(selected_heatmap_data()) 
-  genes <- rownames(selected_heatmap_data())  
-
-  # Generate a multi-select dropdown for selecting genes
-  selectInput(
-    inputId = "genes",  
-    label = "Select or Type Genes:",  
-    choices = c("All", genes),  # Include an "All" option followed by the list of genes
-    multiple = TRUE,  
-    selected = genes[1:7]  
-  )
-})
-  
-# Render the UI for selecting conditions based on the selected heatmap dataset
-output$condition_selector <- renderUI({
-  req(selected_heatmap_data())  
-  conditions <- colnames(selected_heatmap_data())  
-  
-  # Generate a multi-select dropdown for selecting conditions
-  selectInput(
-    inputId = "conditions",  
-    label = "Select or Type Conditions:",  
-    choices = c("All", conditions),  
-    multiple = TRUE,  
-    selected = conditions[1:15]  
-  )
-})
-
-heatmap_data <- reactive({
-  # Reactive function to dynamically generate heatmap data based on user selections.
-  req(selected_heatmap_data(), input$genes, input$conditions)
-  selected_genes <- if ("All" %in% input$genes) rownames(selected_heatmap_data()) else input$genes # If the user selects "All" for genes, include all row names from the dataset.
-  selected_conditions <- if ("All" %in% input$conditions) colnames(selected_heatmap_data()) else input$conditions # If the user selects "All" for conditions, include all column names from the dataset.
-
-    # Extract selected data
-  data <- selected_heatmap_data()[selected_genes, selected_conditions, drop = FALSE]
-  
-  # Apply clustering if needed
-  if (input$cluster_rows) {
-    # If the user has selected to cluster rows:
-    row_dist <- dist(data, method = input$distance_metric) # Computes the distance matrix for rows using the user-specified distance metric.
-    row_clust <- hclust(row_dist, method = input$clustering_method)  # Performs hierarchical clustering on the row distance matrix using the user-specified clustering method.
-    data <- data[order.dendrogram(as.dendrogram(row_clust)), ] # Reorders the rows of the data based on the clustering results.
-  }
-  
-  if (input$cluster_columns) {
-    # If the user has selected to cluster columns:
-    col_dist <- dist(t(data), method = input$distance_metric)
-    col_clust <- hclust(col_dist, method = input$clustering_method)
-    data <- data[, order.dendrogram(as.dendrogram(col_clust))]
-  }
-  
-  data
-  # Returns the processed data, either clustered or in its original order, based on user inputs.
-})
-
-# Render an interactive heatmap using Plotly
-output$heatmap_interactive <- renderPlotly({ # Defines a Plotly-based heatmap output that dynamically updates based on reactive heatmap data.
-    req(heatmap_data())
-  # Convert heatmap data to long format for ggplot
-  melted_data <- heatmap_data() %>% # Uses the reactive heatmap data as the input for conversion.
-    as.data.frame() %>% # Converts the heatmap data into a data frame to facilitate transformations.
-    rownames_to_column(var = "Gene") %>% 
-    reshape2::melt( # Reshapes the data from wide format (conditions as columns) to long format (one row per gene-condition pair).
-      id.vars = "Gene", # Specifies "Gene" as the identifier column to remain unchanged during reshaping.
-      variable.name = "Condition",  # Renames the wide-format columns (conditions) as "Condition" in the long-format output.
-      value.name = "Fitness" # Stores the values (fitness scores) in a new column named "Fitness" in the reshaped data.
-    )
-  
-  # Create the heatmap plot using ggplot2
-  p <- ggplot(melted_data, aes(x = Condition, y = Gene, fill = Fitness)) +  # Initializes the ggplot object with the melted data.
-    geom_tile() + # Uses tiles to create the heatmap cells, where each cell represents a gene-condition pair.
-    scale_fill_viridis() + # Applies the Viridis color scale for the "Fitness" variable
-    theme_minimal() +                  
-    labs(                              
-      x = NULL,                      
-      y = NULL,                      
-      fill = "Fitness Score"   # Sets the legend title for the color scale.
-    ) +
+  # Render the UI for selecting genes based on the selected heatmap dataset
+  output$gene_selector <- renderUI({
+    req(selected_heatmap_data()) 
+    genes <- rownames(selected_heatmap_data())  
     
-    theme(                             
-      axis.text.x = element_text(    
-        angle = 90,                # Rotates the x-axis labels 90 degrees.
-        hjust = 1                  # Aligns the labels horizontally for clarity.
+    # Generate a multi-select dropdown for selecting genes
+    selectInput(
+      inputId = "genes",  
+      label = "Select or Type Genes:",  
+      choices = c("All", genes),  # Include an "All" option followed by the list of genes
+      multiple = TRUE,  
+      selected = genes[1:7]  
+    )
+  })
+  
+  # Render the UI for selecting conditions based on the selected heatmap dataset
+  output$condition_selector <- renderUI({
+    req(selected_heatmap_data())  
+    conditions <- colnames(selected_heatmap_data())  
+    
+    # Generate a multi-select dropdown for selecting conditions
+    selectInput(
+      inputId = "conditions",  
+      label = "Select or Type Conditions:",  
+      choices = c("All", conditions),  
+      multiple = TRUE,  
+      selected = conditions[1:15]  
+    )
+  })
+  
+  heatmap_data <- reactive({
+    # Reactive function to dynamically generate heatmap data based on user selections.
+    req(selected_heatmap_data(), input$genes, input$conditions)
+    selected_genes <- if ("All" %in% input$genes) rownames(selected_heatmap_data()) else input$genes # If the user selects "All" for genes, include all row names from the dataset.
+    selected_conditions <- if ("All" %in% input$conditions) colnames(selected_heatmap_data()) else input$conditions # If the user selects "All" for conditions, include all column names from the dataset.
+    
+    # Inform users
+    
+    data <- selected_heatmap_data()[selected_genes, selected_conditions, drop = FALSE]
+    if (input$cluster_rows && nrow(data) < 2) {
+      showNotification("Please select at least 2 genes for clustering.", type = "error")
+      validate(need(FALSE, "Please select at least 2 genes for clustering."))
+    }
+    
+    if (input$cluster_columns && ncol(data) < 2) {
+      showNotification("Please select at least 2 conditions for clustering.", type = "error")
+      validate(need(FALSE, "Please select at least 2 conditions for clustering."))
+    }
+    
+    # Extract selected data
+    data <- selected_heatmap_data()[selected_genes, selected_conditions, drop = FALSE]
+    
+    # Apply clustering if needed
+    if (input$cluster_rows) {
+      # If the user has selected to cluster rows:
+      row_dist <- dist(data, method = input$distance_metric) # Computes the distance matrix for rows using the user-specified distance metric.
+      row_clust <- hclust(row_dist, method = input$clustering_method)  # Performs hierarchical clustering on the row distance matrix using the user-specified clustering method.
+      data <- data[order.dendrogram(as.dendrogram(row_clust)), ] # Reorders the rows of the data based on the clustering results.
+    }
+    
+    if (input$cluster_columns) {
+      # If the user has selected to cluster columns:
+      col_dist <- dist(t(data), method = input$distance_metric)
+      col_clust <- hclust(col_dist, method = input$clustering_method)
+      data <- data[, order.dendrogram(as.dendrogram(col_clust))]
+    }
+    
+    data
+    # Returns the processed data, either clustered or in its original order, based on user inputs.
+  })
+  
+  # Render an interactive heatmap using Plotly
+  output$heatmap_interactive <- renderPlotly({ # Defines a Plotly-based heatmap output that dynamically updates based on reactive heatmap data.
+    req(heatmap_data())
+    # Convert heatmap data to long format for ggplot
+    melted_data <- heatmap_data() %>% # Uses the reactive heatmap data as the input for conversion.
+      as.data.frame() %>% # Converts the heatmap data into a data frame to facilitate transformations.
+      rownames_to_column(var = "Gene") %>% 
+      reshape2::melt( # Reshapes the data from wide format (conditions as columns) to long format (one row per gene-condition pair).
+        id.vars = "Gene", # Specifies "Gene" as the identifier column to remain unchanged during reshaping.
+        variable.name = "Condition",  # Renames the wide-format columns (conditions) as "Condition" in the long-format output.
+        value.name = "Fitness" # Stores the values (fitness scores) in a new column named "Fitness" in the reshaped data.
+      )
+    
+    # Create the heatmap plot using ggplot2
+    p <- ggplot(melted_data, aes(x = Condition, y = Gene, fill = Fitness)) +  # Initializes the ggplot object with the melted data.
+      geom_tile() + # Uses tiles to create the heatmap cells, where each cell represents a gene-condition pair.
+      scale_fill_viridis() + # Applies the Viridis color scale for the "Fitness" variable
+      theme_minimal() +                  
+      labs(                              
+        x = NULL,                      
+        y = NULL,                      
+        fill = "Fitness Score"   # Sets the legend title for the color scale.
+      ) +
+      
+      theme(                             
+        axis.text.x = element_text(    
+          angle = 90,                # Rotates the x-axis labels 90 degrees.
+          hjust = 1                  # Aligns the labels horizontally for clarity.
+        )
+      )
+    
+    
+    
+    # Convert the static ggplot heatmap into an interactive Plotly heatmap
+    ggplotly(p) %>% # Enables interactive features such as zooming, panning, and tooltips.
+      layout(xaxis = list(tickangle = 90)
+      )
+  })
+  
+  # Render a heatmap with dendrograms for clustering
+  output$heatmap_dendrogram <- renderPlot({
+    req(heatmap_data())
+    # Generate the heatmap using the ComplexHeatmap package
+    Heatmap(
+      heatmap_data(), # The matrix or data frame to be visualized in the heatmap.
+      name = "Fitness Score", # Title for the color scale (legend) indicating the fitness scores.
+      # Clustering options
+      cluster_rows = input$cluster_rows, # Enables or disables clustering of rows based on user input.
+      cluster_columns = input$cluster_columns, # Enables or disables clustering of columns based on user input.
+      clustering_distance_rows = input$distance_metric, # Specifies the distance metric (e.g., Euclidean, Manhattan) for row clustering.
+      clustering_distance_columns = input$distance_metric, # Specifies the distance metric for column clustering.
+      clustering_method_rows = input$clustering_method, # Specifies the clustering method (e.g., complete, average, single) for rows.
+      clustering_method_columns = input$clustering_method, # Specifies the clustering method for columns.
+      
+      # Legend customization
+      heatmap_legend_param = list(
+        title_gp = gpar(fontsize = 14), # Sets the font size for the legend title.
+        labels_gp = gpar(fontsize = 13),# the font size for the legend labels.
+        legend_height = unit(4, "cm"), # the height of the legend box.
+        legend_width = unit(3, "cm") #  the width of the legend box.
       )
     )
+  })
   
-  # Convert the static ggplot heatmap into an interactive Plotly heatmap
-  ggplotly(p) %>% # Enables interactive features such as zooming, panning, and tooltips.
-    layout(xaxis = list(tickangle = 90)) 
-})
-
-# Render a heatmap with dendrograms for clustering
-output$heatmap_dendrogram <- renderPlot({
-  req(heatmap_data())
-  # Generate the heatmap using the ComplexHeatmap package
-  Heatmap(
-    heatmap_data(), # The matrix or data frame to be visualized in the heatmap.
-    name = "Fitness Score", # Title for the color scale (legend) indicating the fitness scores.
-    # Clustering options
-    cluster_rows = input$cluster_rows, # Enables or disables clustering of rows based on user input.
-    cluster_columns = input$cluster_columns, # Enables or disables clustering of columns based on user input.
-    clustering_distance_rows = input$distance_metric, # Specifies the distance metric (e.g., Euclidean, Manhattan) for row clustering.
-    clustering_distance_columns = input$distance_metric, # Specifies the distance metric for column clustering.
-    clustering_method_rows = input$clustering_method, # Specifies the clustering method (e.g., complete, average, single) for rows.
-    clustering_method_columns = input$clustering_method, # Specifies the clustering method for columns.
-
-    # Legend customization
-    heatmap_legend_param = list(
-      title_gp = gpar(fontsize = 14), # Sets the font size for the legend title.
-      labels_gp = gpar(fontsize = 13),# the font size for the legend labels.
-      legend_height = unit(4, "cm"), # the height of the legend box.
-      legend_width = unit(3, "cm") #  the width of the legend box.
+  
+  # Render a UI element for selecting a dataset
+  output$dataset_selector <- renderUI({ # Dynamically generates a dropdown menu for dataset selection in the UI.
+    selectInput(
+      inputId = "selected_dataset", # Unique identifier for the dropdown menu. This ID will be used to access the user's selection in the server logic.
+      label = "Select Dataset", # Label displayed above the dropdown menu to guide the user.
+      choices = names(heatmap_datasets), # Populates the dropdown menu with the names of available datasets.
+      selected = "Nichols, R. et al." # Pre-selects a default dataset ("Nichols, R. et al.") in the dropdown when the UI is first rendered.
     )
-  )
-})
-
+  })
   
-# Render a UI element for selecting a dataset
-output$dataset_selector <- renderUI({ # Dynamically generates a dropdown menu for dataset selection in the UI.
-  selectInput(
-    inputId = "selected_dataset", # Unique identifier for the dropdown menu. This ID will be used to access the user's selection in the server logic.
-    label = "Select Dataset", # Label displayed above the dropdown menu to guide the user.
-    choices = names(heatmap_datasets), # Populates the dropdown menu with the names of available datasets.
-    selected = "Nichols, R. et al." # Pre-selects a default dataset ("Nichols, R. et al.") in the dropdown when the UI is first rendered.
-  )
-})
-
-# Create a download handler for exporting heatmap data
-output$downloadHeatmapData <- downloadHandler( 
-  filename = function() {
-    paste("Heatmap_Data_", Sys.Date(), ".csv", sep = "")
-  },
-  
-  # Define the content of the downloaded file
-  content = function(file) {
-    write.csv(
-      as.data.frame(heatmap_data()), 
-      file,                          
-      row.names = TRUE               
-    )
-  }
-)
-
-# Add a Download Handler for the Dendrogram Plot
-output$downloadDendrogramPlot <- downloadHandler(
-  filename = function() {
-    paste("Dendrogram_Plot_", Sys.Date(), ".pdf", sep = "")
-  },
-  
-  # Define the content of the downloaded file
-  content = function(file) {
-    pdf(file, width = 10, height = 8)
-    draw(
-      Heatmap(
-        heatmap_data(),                   
-        name = "Fitness Score",           
-        cluster_rows = input$cluster_rows,       
-        cluster_columns = input$cluster_columns, 
-        clustering_distance_rows = input$distance_metric, 
-        clustering_distance_columns = input$distance_metric, 
-        clustering_method_rows = input$clustering_method,   
-        clustering_method_columns = input$clustering_method 
+  # Create a download handler for exporting heatmap data
+  output$downloadHeatmapData <- downloadHandler( 
+    filename = function() {
+      paste("Heatmap_Data_", Sys.Date(), ".csv", sep = "")
+    },
+    
+    # Define the content of the downloaded file
+    content = function(file) {
+      write.csv(
+        as.data.frame(heatmap_data()), 
+        file,                          
+        row.names = TRUE               
       )
-    )
-    dev.off()
-  }
-)
-
+    }
+  )
+  
+  # Add a Download Handler for the Dendrogram Plot
+  output$downloadDendrogramPlot <- downloadHandler(
+    filename = function() {
+      paste("Dendrogram_Plot_", Sys.Date(), ".pdf", sep = "")
+    },
+    
+    # Define the content of the downloaded file
+    content = function(file) {
+      pdf(file, width = 10, height = 8)
+      draw(
+        Heatmap(
+          heatmap_data(),                   
+          name = "Fitness Score",           
+          cluster_rows = input$cluster_rows,       
+          cluster_columns = input$cluster_columns, 
+          clustering_distance_rows = input$distance_metric, 
+          clustering_distance_columns = input$distance_metric, 
+          clustering_method_rows = input$clustering_method,   
+          clustering_method_columns = input$clustering_method 
+        )
+      )
+      dev.off()
+    }
+  )
+  
   # Interactive heatmap plot download
   output$downloadInteractiveHeatmapPlot <- downloadHandler(
     filename = function() {
@@ -1194,26 +1210,18 @@ output$downloadDendrogramPlot <- downloadHandler(
     file <- input$file_upload$datapath
     
     tryCatch({
-      # Check the file extension
-      if (tools::file_ext(file) == "rds") {
-        # Load the .rds file
-        data <- readRDS(file)
-      } else if (tools::file_ext(file) == "csv") {
+      # Check if the file is a CSV
+      if (tools::file_ext(file) == "csv") {
         # Load the .csv file
-        data <- fread(file)
-        rownames(data) <- data[[1]]  # Set the first column as row names
-        data <- data[ , -1, with = FALSE]  # Remove the first column
+        data <- read.csv(file, row.names = 1, check.names = FALSE)
       } else {
-        stop("Unsupported file type. Please upload a .rds or .csv file.")
+        stop("Unsupported file type. Please upload a .csv file.")
       }
       
       # Ensure all columns are numeric
       if (!all(sapply(data, is.numeric))) {
         stop("The uploaded dataset must contain only numeric values.")
       }
-      
-      # Replace missing values
-      data[is.na(data)] <- median(as.numeric(unlist(data)), na.rm = TRUE)
       
       # Return the processed data
       as.data.frame(data)
@@ -1264,8 +1272,8 @@ output$downloadDendrogramPlot <- downloadHandler(
         values_to = "Score"       
       ) %>% 
       mutate(Score = round(Score, 4)) # Round the "Score" values to 4 decimal points
-
-        # Transform FDR results into a long format with rounded FDR values
+    
+    # Transform FDR results into a long format with rounded FDR values
     fdr_long <- fdr_results() %>% 
       pivot_longer(                
         -Gene,                    
@@ -1277,11 +1285,11 @@ output$downloadDendrogramPlot <- downloadHandler(
     # Combine the dataset with FDR results
     combined_data <- Scored_Dataset_fdr %>% 
       left_join(fdr_long, by = c("Gene", "Condition")) # Merge datasets by "Gene" and "Condition"
-
+    
     # Return the combined dataset with scores and FDR values
     return(combined_data)
   })
-    observe({
+  observe({
     req(Score_plus_FDR())
     unique_genes2 <- unique(Score_plus_FDR()$Gene)       
     unique_conditions <- unique(Score_plus_FDR()$Condition) 
@@ -1318,7 +1326,7 @@ output$downloadDendrogramPlot <- downloadHandler(
   # Generate filtered phenotype data for selected genes at the gene level
   Genes_phenotypes_2 <- reactive({
     req(input$Gene5, Score_plus_FDR())
-        dplyr::filter(Score_plus_FDR(), Gene %in% input$Gene5) %>%
+    dplyr::filter(Score_plus_FDR(), Gene %in% input$Gene5) %>%
       mutate(
         Fitness = case_when(
           Score > 0 ~ 'Increased', 
@@ -1331,7 +1339,7 @@ output$downloadDendrogramPlot <- downloadHandler(
   # Generate filtered phenotype data for selected conditions at the condition level
   Conditions_phenotypes_2 <- reactive({
     req(input$Condition1, Score_plus_FDR())
-        dplyr::filter(Score_plus_FDR(), Condition %in% input$Condition1) %>%
+    dplyr::filter(Score_plus_FDR(), Condition %in% input$Condition1) %>%
       mutate(
         Fitness = case_when(
           Score > 0 ~ 'Increased',  
@@ -1410,7 +1418,7 @@ output$downloadDendrogramPlot <- downloadHandler(
       rownames = FALSE
     )
   })
-
+  
   # Render bar plot for significant phenotypes for Gene-Level
   output$barplotgenesig <- renderPlotly({
     req(Genes_phenotypes_sig_2())
@@ -1460,7 +1468,7 @@ output$downloadDendrogramPlot <- downloadHandler(
     filename = function() {
       paste("Gene_Level_All_Phenotypes_", Sys.Date(), ".csv", sep = "")
     },
-      content = function(file) {
+    content = function(file) {
       req(Genes_phenotypes_2())
       write.csv(Genes_phenotypes_2(), file, row.names = FALSE)
     }
@@ -1513,7 +1521,7 @@ output$downloadDendrogramPlot <- downloadHandler(
     filename = function() {
       paste("Condition_Level_All_Phenotypes_", Sys.Date(), ".csv", sep = "")
     },
-      content = function(file) {
+    content = function(file) {
       req(Conditions_phenotypes_2())
       write.csv(Conditions_phenotypes_2(), file, row.names = FALSE)
     }
@@ -1719,7 +1727,7 @@ output$downloadDendrogramPlot <- downloadHandler(
   })
   
   #nRender "All Correlations" Table 
-  output$ iletablegenecor <- DT::renderDataTable({
+  output$filetablegenecor <- DT::renderDataTable({
     req(all_gene_cor_2())
     
     # Render the dataset as an interactive DataTable
@@ -1936,7 +1944,7 @@ output$downloadDendrogramPlot <- downloadHandler(
   observeEvent(input$FDRq3, {
     cond_cor_sig()
   })
-
+  
   # Render "Significant Correlations" Table 
   output$filetableconditioncorsig <- DT::renderDataTable({
     req(cond_cor_sig())
@@ -2016,7 +2024,7 @@ output$downloadDendrogramPlot <- downloadHandler(
     },
     content = function(fname) {
       req(cond_cor_sig())
-
+      
       write.csv(
         cond_cor_sig(),  
         fname,           
@@ -2108,7 +2116,7 @@ output$downloadDendrogramPlot <- downloadHandler(
     on.exit(shinyjs::hide("loading_heatmap"))
     as.matrix(dataset())
   })
-    heatmap_data_2 <- reactive({
+  heatmap_data_2 <- reactive({
     req(input$genes2, input$conditions, heatmap_matrix())
     selected_genes2 <- if ("All" %in% input$genes2) 
       rownames(heatmap_matrix()) 
@@ -2119,6 +2127,17 @@ output$downloadDendrogramPlot <- downloadHandler(
     else 
       input$conditions  
     data <- heatmap_matrix()[selected_genes2, selected_conditions, drop = FALSE]
+    # Inform user if clustering is selected with fewer than 2 genes/conditions
+    if (input$cluster_rows2 && nrow(data) < 2) {
+      showNotification("Please select at least 2 genes for clustering.", type = "error")
+      validate(need(FALSE, "Please select at least 2 genes for clustering."))
+    }
+    
+    if (input$cluster_columns2 && ncol(data) < 2) {
+      showNotification("Please select at least 2 conditions for clustering.", type = "error")
+      validate(need(FALSE, "Please select at least 2 conditions for clustering."))
+    }
+    
     if (input$cluster_rows2) {
       row_dist <- dist(data, method = input$distance_metric2)  
       row_clust <- hclust(row_dist, method = input$clustering_method2)  

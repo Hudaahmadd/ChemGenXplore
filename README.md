@@ -102,7 +102,7 @@ ChemGenXplore was developed with the support of The Banzhaf Lab and The Moradiga
 
 - Institute of Microbiology and Infection, School of Biosciences, University of Birmingham, Birmingham, UK
 - Biosciences Institute, Faculty of Medical Sciences, Newcastle University, Newcastle upon Tyne, UK
-- Laboratory of Infectious Disease Epidemiology, KAUST Center of Excellence for Smart Health, Biological and Environmental Science and Engineering (BESE) Division, King Abdullah University of Science and Technology (KAUST), Thuwal, Saudi Arabia
+- Laboratory of Infectious Disease Epidemiology, KAUST Center of Excellence for Smart Health and Biological and Environmental Science and Engineering (BESE) Division, King Abdullah University of Science and Technology (KAUST), Thuwal, Saudi Arabia
 
 This work is supported by The Darwin Trust of Edinburgh, which funds my PhD studies.
 
