@@ -4,7 +4,7 @@
 # 3. Body 
 
 ui <- dashboardPage(
-  title = "ChemGenXplore",  # ✅ this sets the browser tab title
+  title = "ChemGenXplore",  # browser tab title
   # Dashboard Header: Displays the application title
   dashboardHeader(
     title = span("By Banzhaf & Moradigaravand Labs", style = "font-weight: bold; color: #FFFFFF; font-size: 15px;"), # Title with custom styling
