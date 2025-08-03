@@ -132,7 +132,7 @@ server <- function(input, output, session) {
     # Render a selectInput UI element for gene selection
     selectInput(
       inputId = "genes",  
-      label = "Select or Type Genes:",  # Label displayed above the dropdown
+      label = "Select Genes",  # Label displayed above the dropdown
       choices = c("All", genes),  # Add an "All" option at the top of the list
       multiple = TRUE,  # Allow multiple gene selections
       selected = genes[1:7]  # Default selection: the first 7 genes
@@ -149,7 +149,7 @@ server <- function(input, output, session) {
     # Render a selectInput UI element for condition selection
     selectInput(
       inputId = "conditions",  
-      label = "Select or Type Conditions:",  
+      label = "Select Conditions",  
       choices = c("All", conditions),  
       multiple = TRUE,  
       selected = conditions[1:12]  
@@ -177,7 +177,7 @@ server <- function(input, output, session) {
     DT::datatable(
       Genes_phenotypes(),  # Use the data from the Genes_phenotypes reactive function
       options = list(
-        pageLength = 10,  # Display 10 rows per page by default
+        pageLength = 15,  # Display 15 rows per page by default
         scrollX = TRUE    # Enable horizontal scrolling for wide tables
       ),
       rownames = FALSE  # Do not display row names in the table
@@ -318,7 +318,7 @@ server <- function(input, output, session) {
     DT::datatable(
       Conditions_phenotypes(),  
       options = list(
-        pageLength = 10,  
+        pageLength = 15,  
         scrollX = TRUE    
       ),
       rownames = FALSE  
@@ -356,7 +356,7 @@ server <- function(input, output, session) {
     DT::datatable(
       Conditions_phenotypes_sig(),  
       options = list(
-        pageLength = 10,  
+        pageLength = 15,  
         scrollX = TRUE    
       ),
       rownames = FALSE  
@@ -464,7 +464,7 @@ server <- function(input, output, session) {
     DT::datatable(
       all_gene_cor(),  
       options = list(
-        pageLength = 10,  
+        pageLength = 15,  
         scrollX = TRUE    
       ),
       rownames = FALSE  
@@ -588,7 +588,7 @@ output$conditions_correlations_filetable <- DT::renderDataTable({
   DT::datatable(
     all_cond_cor(),  
     options = list(
-      pageLength = 10,  
+      pageLength = 15,  
       scrollX = TRUE    
     ),
     rownames = FALSE  
@@ -714,7 +714,7 @@ output$filetableGO <- DT::renderDataTable({
   DT::datatable(
     all_go(),  
     options = list(
-      pageLength = 10,  
+      pageLength = 15,  
       scrollX = TRUE    
     ),
     rownames = FALSE  
@@ -848,7 +848,7 @@ output$filetableKEGG <- DT::renderDataTable({
   DT::datatable(
     all_kegg(),  
     options = list(
-      pageLength = 10,  
+      pageLength = 15,  
       scrollX = TRUE    
     ),
     rownames = FALSE  
@@ -978,7 +978,7 @@ output$gene_selector <- renderUI({
   # Generate a multi-select dropdown for selecting genes
   selectInput(
     inputId = "genes",  
-    label = "Select or Type Genes:",  
+    label = "Select Genes",  
     choices = c("All", genes),  # Include an "All" option followed by the list of genes
     multiple = TRUE,  
     selected = genes[1:7]  
@@ -993,7 +993,7 @@ output$condition_selector <- renderUI({
   # Generate a multi-select dropdown for selecting conditions
   selectInput(
     inputId = "conditions",  
-    label = "Select or Type Conditions:",  
+    label = "Select Conditions",  
     choices = c("All", conditions),  
     multiple = TRUE,  
     selected = conditions[1:15]  
@@ -1348,7 +1348,7 @@ output$downloadDendrogramPlot <- downloadHandler(
     DT::datatable(
       Genes_phenotypes_2(),                 
       options = list(                      
-        pageLength = 10,                  
+        pageLength = 15,                  
         scrollX = TRUE                     
       ),
       rownames = FALSE                      
@@ -1362,7 +1362,7 @@ output$downloadDendrogramPlot <- downloadHandler(
     DT::datatable(
       Conditions_phenotypes_2(),             
       options = list(                        
-        pageLength = 10,                  
+        pageLength = 15,                  
         scrollX = TRUE                  
       ),
       rownames = FALSE                       
@@ -1726,7 +1726,7 @@ output$downloadDendrogramPlot <- downloadHandler(
     DT::datatable(
       all_gene_cor_2(),  
       options = list(
-        pageLength = 10,    
+        pageLength = 15,    
         scrollX = TRUE    
       ),
       rownames = FALSE  
@@ -1987,7 +1987,7 @@ output$downloadDendrogramPlot <- downloadHandler(
     DT::datatable(
       cond_cor(),  
       options = list(
-        pageLength = 10,  
+        pageLength = 15,  
         scrollX = TRUE      
       ),
       rownames = FALSE  
@@ -2140,7 +2140,7 @@ output$downloadDendrogramPlot <- downloadHandler(
     # Create a dropdown menu for gene selection
     selectInput(
       inputId = "genes2",          
-      label = "Select or Type Genes:",     
+      label = "Select Genes",     
       choices = c("All", genes2), 
       multiple = TRUE,             
       selected = genes2[1:7]       
@@ -2157,7 +2157,7 @@ output$downloadDendrogramPlot <- downloadHandler(
     # Create a dropdown menu for condition selection
     selectInput(
       inputId = "conditions",         
-      label = "Select or Type Conditions:",    
+      label = "Select Conditions",    
       choices = c("All", conditions), 
       multiple = TRUE,                
       selected = conditions[1:12]     
