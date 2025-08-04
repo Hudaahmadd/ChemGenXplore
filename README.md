@@ -99,12 +99,12 @@ To run **ChemGenXplore** locally, follow these steps:
      ```
 Or, you can open the app.R file in RStudio and click Run App.
 
-Alternatively, if you do not wish to use renv, you can manually install the required packages by running:
-     
+Alternatively, if you do not wish to use renv
+
+    You can manually install the required packages by running:
      ```bash
       source("packages.R")
      ```
-
 
 
 ## Data Sources
