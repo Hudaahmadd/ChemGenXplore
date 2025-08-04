@@ -1007,7 +1007,6 @@ server <- function(input, output, session) {
     selected_conditions <- if ("All" %in% input$conditions) colnames(selected_heatmap_data()) else input$conditions # If the user selects "All" for conditions, include all column names from the dataset.
     
     # Inform user if clustering is selected with fewer than 2 genes/conditions
-
     
     data <- selected_heatmap_data()[selected_genes, selected_conditions, drop = FALSE]
     if (input$cluster_rows && nrow(data) < 2) {
