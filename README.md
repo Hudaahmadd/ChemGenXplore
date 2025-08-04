@@ -79,13 +79,32 @@ To run **ChemGenXplore** locally, follow these steps:
      ```bash
       cd ChemGenXplore
      ```
-3. **Run the Application**
+3. **Open RStudio and Set the Working Directory**
+    
+    Launch RStudio and set the working directory to the ChemGenXplore folder.
 
-    Launch the app by running the following command in your terminal:
+4. **Install and Use renv to Restore Dependencies**
+
+    In the R console, run the following commands:
+    ```bash
+    install.packages("renv")
+    renv::restore()
+    ```
+
+5. **Run the Application**
+
+    After the environment has been restored, run:
      ```bash
-      Rscript app.R
+      shiny::runApp()
      ```
-Alternatively, you can open the app.R file in RStudio and click Run App.
+Or, you can open the app.R file in RStudio and click Run App.
+
+Alternatively, if you do not wish to use renv, you can manually install the required packages by running:
+     ```bash
+     source("packages.R")
+     ```
+
+
 
 ## Data Sources
 ChemGenXplore includes three pre-integrated, publicly available *Escherichia coli* datasets from chemical genomic screens. These datasets provide fitness scores across a wide range of conditions and serve as the foundation for the analyses performed in ChemGenXplore:
