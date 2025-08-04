@@ -112,14 +112,14 @@ To avoid dealing with dependencies or setting up the R environment manually, you
 
 1. **Pull the Docker Image from DockerHub**
 
-Open your terminal and run:
+    Open your terminal and run:
 ```r
     docker pull hudaahmad/chemgenxplore:latest
 ```
 
 2. **Run the Docker Container**
 
-Start the application by running:
+    Start the application by running:
   
 ```r
   docker run -p 3838:3838 hudaahmad/chemgenxplore:latest
@@ -127,7 +127,7 @@ Start the application by running:
 
 3. **Access the Application in Your Browser**
 
-Once the container is running, open your web browser and go to: http://localhost:3838
+    Once the container is running, open your web browser and go to: http://localhost:3838
 
 
 ## Data Sources
