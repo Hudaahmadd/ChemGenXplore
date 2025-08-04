@@ -42,7 +42,7 @@ Chemical genomic screens are a valuable resource for uncovering gene functions a
 
 - **Upload Your Own Dataset**:
   - Upload custom datasets formatted with genes as rows and conditions as columns (CSV format). Example below:
->>>>>>> 2eb2088 (Updated README from GitHub)
+
     <p>
       <img src="www/example_dataset.png" alt="Logo" width="300">
     </p>
