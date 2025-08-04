@@ -103,6 +103,7 @@ Alternatively, if you do not wish to use renv, you can manually install the requ
 
       ```r
       source("packages.R")
+      ```
 
 
 ## Data Sources
