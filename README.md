@@ -106,6 +106,7 @@ Alternatively, if you do not wish to use renv, you can manually install the requ
 
 
 
+
 ## Data Sources
 ChemGenXplore includes three pre-integrated, publicly available *Escherichia coli* datasets from chemical genomic screens. These datasets provide fitness scores across a wide range of conditions and serve as the foundation for the analyses performed in ChemGenXplore:
 
