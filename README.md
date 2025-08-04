@@ -113,15 +113,17 @@ To avoid dealing with dependencies or setting up the R environment manually, you
 1. **Pull the Docker Image from DockerHub**
 
 Open your terminal and run:
-   ```bash
+```r
     docker pull hudaahmad/chemgenxplore:latest
+```
 
 2. **Run the Docker Container**
 
 Start the application by running:
   
-   ```bash
+```r
   docker run -p 3838:3838 hudaahmad/chemgenxplore:latest
+```
 
 3. **Access the Application in Your Browser**
 
