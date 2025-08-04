@@ -104,6 +104,28 @@ Alternatively, if you do not wish to use renv, you can manually install the requ
 ```r
 source("packages.R")
 ```
+---
+
+### Option 3: Run via DockerHub
+
+To avoid dealing with dependencies or setting up the R environment manually, you can run ChemGenXplore directly using Docker.
+
+1. **Pull the Docker Image from DockerHub**
+
+Open your terminal and run:
+   ```bash
+    docker pull hudaahmad/chemgenxplore:latest
+
+2. **Run the Docker Container**
+
+Start the application by running:
+  
+   ```bash
+  docker run -p 3838:3838 hudaahmad/chemgenxplore:latest
+
+3. **Access the Application in Your Browser**
+
+Once the container is running, open your web browser and go to: http://localhost:3838
 
 
 ## Data Sources
