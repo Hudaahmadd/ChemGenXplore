@@ -57,9 +57,10 @@ There are two ways to use **ChemGenXplore**: via the hosted Shiny application or
 
 ### Option 1: Hosted Shiny Application
 
-The easiest way to use **ChemGenXplore** is through the hosted Shiny application. Access it directly at:
+The easiest way to use **ChemGenXplore** is through the hosted Shiny application. You can access the app via either of the following links:
 
-[**ChemGenXplore Shiny App**](< https://hudaahmad.shinyapps.io/chemgenxplore/>)
+[**ChemGenXplore on KAUST Server**](< https://chemgenxplore.kaust.edu.sa/>)
+[**ChemGenXplore on Shinyapps.io**](< https://hudaahmad.shinyapps.io/chemgenxplore/>)
 
 ---
 
