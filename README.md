@@ -43,8 +43,9 @@ Chemical genomic screens are a valuable resource for uncovering gene functions a
     </p>
     
   - Use the same phenotypic, correlation, enrichment, and heatmap analysis tools available for the E. coli dataset.
-  - Test File  
-    The test file `Scored_Published_Dataset.csv` is located in the `Example_Dataset` folder.
+
+- **Test File**
+  - The test file `Scored_Published_Dataset.csv` is located in the `Example_Dataset` folder.
 
 
 **All plots and data tables generated can be downloaded.**
