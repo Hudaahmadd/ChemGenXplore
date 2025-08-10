@@ -37,17 +37,16 @@ Chemical genomic screens are a valuable resource for uncovering gene functions a
 
 - **Upload Your Own Dataset**:
   - Upload a CSV file where rows contain unique identifiers (e.g., genes, samples, strains) and columns contain experimental measurements (e.g., fitness scores, gene expression       levels, growth rates). Example Dataset Below:
-  - Choose from multiple distance metrics (e.g., Euclidean, Manhattan) for clustering rows and columns.
-  - Interact with heatmaps by zooming into specific regions.
-
-- **Upload Your Own Dataset**:
-  - Upload custom datasets formatted with genes as rows and conditions as columns (CSV format). Example below:
 
     <p>
       <img src="www/example_dataset.png" alt="Logo" width="300">
     </p>
     
   - Use the same phenotypic, correlation, enrichment, and heatmap analysis tools available for the E. coli dataset.
+
+- **Test File**  
+  The test file `Scored_Published_Dataset.csv` is located in the `Example_Dataset` folder.
+
 
 **All plots and data tables generated can be downloaded.**
 
