@@ -42,7 +42,10 @@ Chemical genomic screens are a valuable resource for uncovering gene functions a
       <img src="www/example_dataset.png" alt="Logo" width="300">
     </p>
     
-  - To ensure compatibility, uploaded datasets must be CSV files with a single header row. The first column must contain unique gene/strain identifiers (treated as row names); all remaining columns must be numeric fitness measurements for individual conditions, with unique condition names as column headers. The matrix must be rectangular (one row per gene/strain × one column per condition) with no extra metadata columns beyond the first identifier column. Missing values (NA) are allowed and handled via pairwise-complete methods; any non-numeric entry in measurement columns triggers an error.
+  - uploaded datasets must be CSV files with a single header row.
+  - The first column must contain unique gene/strain identifiers (treated as row names); all remaining columns must be numeric fitness measurements for individual conditions, with unique condition names as column headers.
+  - The matrix must be rectangular (one row per gene/strain × one column per condition) with no extra metadata columns beyond the first identifier column.
+  - Missing values (NA) are allowed and handled via pairwise-complete methods; any non-numeric entry in measurement columns triggers an error.
   - Use the same phenotypic, correlation, enrichment, and heatmap analysis tools available for the E. coli dataset.
 
 - **Test File**
