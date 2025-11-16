@@ -129,12 +129,13 @@ To avoid dealing with dependencies or setting up the R environment manually, you
     Start the application by running:
   
 ```r
-  docker run -p 3838:3838 hudaahmad/chemgenxplore:latest
+  docker run --rm -p 3838:3838 hudaahmad/chemgenxplore:latest
 ```
 
 3. **Access the Application in Your Browser**
 
     Once the container is running, open your web browser and go to: http://localhost:3838
+
 
 
 ## Data Sources
