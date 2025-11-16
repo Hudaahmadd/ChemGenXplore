@@ -10,7 +10,83 @@ server <- function(input, output, session) {
   go_file <- readRDS("3_go_enrich.rds")          # Gene Ontology (GO) enrichment data
   kegg_file <- readRDS("3_kegg_enrich.rds")      # KEGG pathway enrichment data
   
+  pryr::mem_used()
   
+  
+  # ---- Pairwise-complete distance helper (no imputation) ----
+  # Supports: euclidean, manhattan, pearson, spearman, cosine
+  # min_prop: minimum proportion of overlapping (non-NA) entries required
+  pc_dist <- function(M,
+                      method = c("euclidean","manhattan","pearson","spearman","cosine"),
+                      min_prop = 2/3, min_n = NULL) {
+    method  <- match.arg(method)
+    M       <- as.matrix(M)
+    m       <- nrow(M); p <- ncol(M)
+    if (is.null(min_n)) min_n <- max(1, floor(min_prop * p))
+    ok <- !is.na(M)
+    
+    if (method %in% c("pearson","spearman")) {
+      R <- suppressWarnings(cor(t(M), use = "pairwise.complete.obs", method = method))
+      N <- tcrossprod(ok)                 # overlap counts per pair
+      R[N < min_n] <- NA_real_            # enforce minimum overlap
+      D <- as.dist(1 - R)                 # distance = 1 - correlation
+      if (any(is.na(D))) stop("Not enough overlap to compute all pairwise correlations.")
+      return(D)
+    }
+    
+    if (method == "cosine") {
+      S <- matrix(NA_real_, m, m); diag(S) <- 1
+      for (i in 1:m) for (j in i:m) {
+        idx <- which(ok[i,] & ok[j,])
+        if (length(idx) < min_n) next
+        xi <- M[i, idx]; xj <- M[j, idx]
+        denom <- sqrt(sum(xi^2)) * sqrt(sum(xj^2))
+        sim <- if (denom > 0) sum(xi * xj) / denom else NA_real_
+        S[i,j] <- S[j,i] <- sim
+      }
+      D <- as.dist(1 - S)
+      if (any(is.na(D))) stop("Not enough overlap to compute all cosine distances.")
+      return(D)
+    }
+    
+    # euclidean / manhattan with pairwise-complete overlap
+    Dmat <- matrix(NA_real_, m, m); diag(Dmat) <- 0
+    for (i in 1:m) for (j in i:m) {
+      idx <- which(ok[i,] & ok[j,])
+      if (length(idx) < min_n) next
+      xi <- M[i, idx]; xj <- M[j, idx]
+      d <- if (method == "euclidean") sqrt(sum((xi - xj)^2)) else sum(abs(xi - xj))
+      Dmat[i,j] <- Dmat[j,i] <- d
+    }
+    D <- as.dist(Dmat)
+    if (any(is.na(D))) stop("Not enough overlap to compute all distances.")
+    D
+  }
+  
+  
+  
+  ### test
+  observe({
+    req(dataset())
+    
+    size_dataset <- pryr::object_size(dataset())
+    size_fdr <- pryr::object_size(fdr_results())
+    size_score_fdr <- pryr::object_size(Score_plus_FDR())
+    size_gene_cor <- if (!is.null(gene_correlation())) pryr::object_size(gene_correlation()) else pryr::object_size(0)
+    size_cond_cor <- if (!is.null(condition_correlation())) pryr::object_size(condition_correlation()) else pryr::object_size(0)
+    total <- size_dataset + size_fdr + size_score_fdr + size_gene_cor + size_cond_cor
+    
+    message("------ ChemGenXplore Memory Usage ------")
+    message("Uploaded Dataset       : ", format(size_dataset, units = "auto"))
+    message("FDR Results            : ", format(size_fdr, units = "auto"))
+    message("Score + FDR Combined   : ", format(size_score_fdr, units = "auto"))
+    message("Gene Correlation Table : ", format(size_gene_cor, units = "auto"))
+    message("Condition Correlation  : ", format(size_cond_cor, units = "auto"))
+    message("Estimated Total        : ", format(total, units = "auto"))
+  })
+  
+  
+  ##test
   # Load heatmap matrices for datasets from three published studies:
   heatmap_datasets <- list(
     "Nichols, R. et al." = readRDS("nichols_heatmap.rds"),
@@ -39,6 +115,7 @@ server <- function(input, output, session) {
       server = TRUE  # Enable server-side processing for better performance with large datasets
     )
     
+
     # Dynamically update the cond1 dropdown menu in the UI as above
     updateSelectizeInput(
       session,
@@ -122,6 +199,7 @@ server <- function(input, output, session) {
     heatmap_datasets[[input$selected_dataset]]  # Retrieve and return the selected dataset from the heatmap_datasets list
   })
   
+  
   # Dynamically render the gene selector input based on the selected heatmap dataset
   output$gene_selector <- renderUI({
     req(selected_heatmap_data())  
@@ -158,7 +236,6 @@ server <- function(input, output, session) {
   
   
   #### Server logic for Phenotypes of Selected Genes ####
-  
   Genes_phenotypes <- reactive({
     req(input$Gene1)  # Ensure that the user has selected at least one gene (Gene1 input must not be NULL)
     
@@ -696,271 +773,207 @@ server <- function(input, output, session) {
       )
     }
   )
-  
   #### Server logic for GO Enrichment ####
   
   # Reactive function to filter GO enrichment data based on selected genes
   all_go <- reactive({
-    # Filter the GO enrichment dataset to include rows where the Gene matches the selected gene(s)
-    dplyr::filter(
-      go_file,  
-      Gene %in% input$Gene3  
-    )
+    # Ensure qvalue is numeric once
+    go_file %>%
+      dplyr::mutate(qvalue = suppressWarnings(as.numeric(qvalue))) %>%
+      dplyr::filter(Gene %in% input$Gene3)
   })
   
   # Render the "All GO Enrichment" table
   output$filetableGO <- DT::renderDataTable({
-    # Create a DataTable using the filtered GO enrichment dataset
     DT::datatable(
-      all_go(),  
-      options = list(
-        pageLength = 10,  
-        scrollX = TRUE    
-      ),
-      rownames = FALSE  
+      all_go(),
+      options = list(pageLength = 10, scrollX = TRUE),
+      rownames = FALSE
     )
   })
   
   # Download handler for the "All GO Enrichment" table
   output$downloadgo <- downloadHandler(
-    # Define the filename dynamically with the current date
-    filename = function() { 
-      paste("All_GO_Enrichment_", Sys.Date(), ".csv", sep = "")  
-    },
-    
-    # Define the content of the file to be downloaded
-    content = function(file) {
-      write.csv(
-        all_go(),       
-        file,           
-        row.names = FALSE  
-      )
-    }
+    filename = function() { paste("All_GO_Enrichment_", Sys.Date(), ".csv", sep = "") },
+    content  = function(file) { write.csv(all_go(), file, row.names = FALSE) }
   )
   
   # Reactive function to filter significant GO terms based on FDR threshold
   sig_go <- reactive({
     dplyr::filter(
-      all_go(),  
-      qvalue <= (input$FDRq4 / 100)  
+      all_go(),
+      !is.na(qvalue),
+      qvalue <= (input$FDRq4 / 100)
     )
   })
   
   # Render the data table of significant GO enrichment
   output$filetableGOs <- DT::renderDataTable({
-    # Create a DataTable using the filtered significant GO enrichment dataset
+    dat <- sig_go()
+    validate(need(nrow(dat) > 0, "No significant GO terms at this FDR. Try increasing % FDR."))
     DT::datatable(
-      sig_go(),  
-      options = list(
-        pageLength = 5,  
-        scrollX = TRUE   
-      ),
-      rownames = FALSE  
+      dat,
+      options = list(pageLength = 5, scrollX = TRUE),
+      rownames = FALSE
     )
   })
   
   # Download handler for significant GO enrichment data
   output$downloadgos <- downloadHandler(
-    # Define the filename for the downloaded file
-    filename = function() { 
-      "GO_enrichment.csv" 
-    },
-    
-    # Define the content of the file to be downloaded
-    content = function(fname) {
-      write.csv(
-        sig_go(),       
-        fname,         
-        row.names = FALSE  
-      )
-    }
+    filename = function() { "GO_enrichment.csv" },
+    content  = function(fname) { write.csv(sig_go(), fname, row.names = FALSE) }
   )
   
   # Reactive function to generate a plot for significant GO enrichment
   plotInputGO <- reactive({
-    sig_go() %>%  
-      group_by(Description) %>%  # Group by the GO term description
-      summarise(
-        Count = sum(Count),  # Summarize by summing the counts for each GO term
-        .groups = "drop"  # Remove grouping after summarisation
+    df <- sig_go()
+    validate(need(nrow(df) > 0, "No significant GO terms at this FDR. Try increasing % FDR."))
+    
+    plot_df <- df %>%
+      dplyr::group_by(Description) %>%
+      dplyr::summarise(
+        Count  = sum(Count, na.rm = TRUE),
+        .groups = "drop"
       ) %>%
-      mutate(
-        # Extract the part of the Description before the first comma
-        Description = str_extract(Description, "^[^,]+"),
-        # Reorder Description by Count for better plotting
-        Description = fct_reorder(Description, Count)
-      ) %>%
-      ggplot(aes(x = Description, y = Count, fill = Description)) +  
-      geom_bar(stat = "identity", width = 0.8) +  # Create a horizontal bar plot
-      coord_flip() +  # Flip the axes for better readability of GO term names
-      ylab("Count of Genes") +  # Set the y-axis label
-      xlab("") +  # Leave the x-axis label blank
-      scale_fill_manual(
-        values = colorRampPalette(RColorBrewer::brewer.pal(8, "Set3"))(n_distinct(sig_go()$Description))  # Dynamic colors for each GO term
-      ) +
-      theme_classic() +  
+      dplyr::mutate(
+        # Clean label before first comma (keeps your original style)
+        ShortDesc = stringr::str_extract(Description, "^[^,]+"),
+        ShortDesc = forcats::fct_reorder(ShortDesc, Count)
+      )
+    
+    # Build a palette from the *final* factor levels (prevents color/label mismatch)
+    labs <- levels(plot_df$ShortDesc)
+    pal  <- colorRampPalette(RColorBrewer::brewer.pal(8, "Set3"))(length(labs))
+    names(pal) <- labs
+    
+    ggplot(plot_df, aes(x = ShortDesc, y = Count, fill = ShortDesc)) +
+      geom_bar(stat = "identity", width = 0.8, colour = "grey30", linewidth = 0.15) +
+      coord_flip() +
+      ylab("Count of Genes") +
+      xlab("") +
+      scale_fill_manual(values = pal) +
+      scale_y_continuous(expand = expansion(mult = c(0, 0.05))) +
+      theme_classic() +
       theme(
-        axis.text.x = element_text(size = 10), 
-        axis.text.y = element_text(size = 10), 
-        axis.title.y = element_text(size = 11), 
-        plot.title = element_blank(),  
-        legend.position = "none"  
+        axis.text.x = element_text(size = 10),
+        axis.text.y = element_text(size = 10),
+        axis.title.y = element_text(size = 11),
+        plot.title   = element_blank(),
+        legend.position = "none"
       )
   })
   
   # Render the interactive plot for GO enrichment
   output$barplotGO <- renderPlotly({
-    ggplotly(plotInputGO())  
+    ggplotly(plotInputGO(), tooltip = c("y", "x"))
   })
   
   # Download handler for GO enrichment plot
   output$downloadgoplot <- downloadHandler(
-    # Define the filename dynamically based on the selected gene(s)
-    filename = function() { 
-      paste(input$Gene3, 'GO_enrichment.pdf', sep = '_')  
-    },
-    
-    # Define the content of the file to be downloaded
-    content = function(file) {
-      ggsave(
-        file,               
-        plotInputGO(),      
-        width = 12,         
-        height = 5         
-      )
-    }
+    filename = function() { paste(input$Gene3, 'GO_enrichment.pdf', sep = '_') },
+    content  = function(file) { ggsave(file, plotInputGO(), width = 12, height = 5) }
   )
   
   #### Server logic for KEGG Enrichment ####
   
   # Reactive function to filter KEGG enrichment data based on selected genes
   all_kegg <- reactive({
-    # Filter the KEGG enrichment dataset to include rows where the Gene matches the selected gene(s)
-    dplyr::filter(
-      kegg_file,  
-      Gene %in% input$Gene4  
-    )
+    # Ensure qvalue is numeric once
+    kegg_file %>%
+      dplyr::mutate(qvalue = suppressWarnings(as.numeric(qvalue))) %>%
+      dplyr::filter(Gene %in% input$Gene4)
   })
   
   # Render the "All KEGG Enrichment" table
   output$filetableKEGG <- DT::renderDataTable({
-    # Create a DataTable using the filtered KEGG enrichment dataset
     DT::datatable(
-      all_kegg(),  
-      options = list(
-        pageLength = 10,  
-        scrollX = TRUE    
-      ),
-      rownames = FALSE  
+      all_kegg(),
+      options = list(pageLength = 10, scrollX = TRUE),
+      rownames = FALSE
     )
   })
   
   # Download handler for the "All KEGG Enrichment" table
   output$downloadkegg <- downloadHandler(
-    # Define the filename dynamically with the current date
-    filename = function() { 
-      paste("All_KEGG_Enrichment_", Sys.Date(), ".csv", sep = "") 
-    },
-    
-    # Define the content of the file to be downloaded
-    content = function(file) {
-      write.csv(
-        all_kegg(),       
-        file,            
-        row.names = FALSE  
-      )
-    }
+    filename = function() { paste("All_KEGG_Enrichment_", Sys.Date(), ".csv", sep = "") },
+    content  = function(file) { write.csv(all_kegg(), file, row.names = FALSE) }
   )
   
   # Reactive function to filter significant KEGG terms based on the FDR threshold
   sig_kegg <- reactive({
     dplyr::filter(
-      all_kegg(), 
-      qvalue <= (input$FDRq5 / 100) 
+      all_kegg(),
+      !is.na(qvalue),
+      qvalue <= (input$FDRq5 / 100)
     )
   })
   
   # Render the data table of significant KEGG enrichment
   output$filetableKEGGs <- DT::renderDataTable({
-    # Create a DataTable using the filtered significant KEGG enrichment dataset
+    dat <- sig_kegg()
+    validate(need(nrow(dat) > 0, "No significant KEGG pathways at this FDR. Try increasing % FDR."))
     DT::datatable(
-      sig_kegg(),  
-      options = list(
-        pageLength = 5,  
-        scrollX = TRUE   
-      ),
-      rownames = FALSE  
+      dat,
+      options = list(pageLength = 5, scrollX = TRUE),
+      rownames = FALSE
     )
   })
   
   # Download handler for significant KEGG enrichment data
   output$downloadkeggs <- downloadHandler(
-    # Define the filename for the downloaded file
-    filename = function() {
-      paste("KEGG_enrichment_", Sys.Date(), ".csv", sep = "")
-    },
-    
-    # Define the content of the file to be downloaded
-    content = function(fname) {
-      write.csv(
-        sig_kegg(),       
-        fname,            
-        row.names = FALSE  
-      )
-    }
+    filename = function() { paste("KEGG_enrichment_", Sys.Date(), ".csv", sep = "") },
+    content  = function(fname) { write.csv(sig_kegg(), fname, row.names = FALSE) }
   )
   
   # Reactive function to generate a plot for significant KEGG enrichment
   plotInputKEGG <- reactive({
-    sig_kegg() %>%  
-      group_by(Description) %>%  
-      summarise(
-        Count = sum(Count),  
-        .groups = "drop"  
+    df <- sig_kegg()
+    validate(need(nrow(df) > 0, "No significant KEGG pathways at this FDR. Try increasing % FDR."))
+    
+    plot_df <- df %>%
+      dplyr::group_by(Description) %>%
+      dplyr::summarise(
+        Count  = sum(Count, na.rm = TRUE),
+        .groups = "drop"
       ) %>%
-      mutate(
-        Description = fct_reorder(Description, Count)  
-      ) %>%
-      ggplot(aes(x = Description, y = Count, fill = Description)) +  
-      geom_bar(stat = "identity", width = 0.8) +  
-      coord_flip() +  
-      ylab("Count of Genes") + 
-      xlab("") +  
-      scale_fill_manual(
-        values = colorRampPalette(RColorBrewer::brewer.pal(8, "Set3"))(nrow(sig_kegg()))  
-      ) +
-      theme_classic() +  
+      dplyr::mutate(
+        ShortDesc = Description,                          # KEGG labels often don't need trimming
+        ShortDesc = forcats::fct_reorder(ShortDesc, Count)
+      )
+    
+    # Palette built from final factor levels (not from nrow)
+    labs <- levels(plot_df$ShortDesc)
+    pal  <- colorRampPalette(RColorBrewer::brewer.pal(8, "Set3"))(length(labs))
+    names(pal) <- labs
+    
+    ggplot(plot_df, aes(x = ShortDesc, y = Count, fill = ShortDesc)) +
+      geom_bar(stat = "identity", width = 0.8, colour = "grey30", linewidth = 0.15) +
+      coord_flip() +
+      ylab("Count of Genes") +
+      xlab("") +
+      scale_fill_manual(values = pal) +
+      scale_y_continuous(expand = expansion(mult = c(0, 0.05))) +
+      theme_classic() +
       theme(
-        axis.text.x = element_text(size = 10),  
-        axis.text.y = element_text(size = 10),  
-        axis.title.y = element_text(size = 11),  
-        plot.title = element_blank(),  
-        legend.position = "none"  
+        axis.text.x = element_text(size = 10),
+        axis.text.y = element_text(size = 10),
+        axis.title.y = element_text(size = 11),
+        plot.title   = element_blank(),
+        legend.position = "none"
       )
   })
   
   # Render the interactive plot for KEGG enrichment
   output$barplotKEGG <- renderPlotly({
-    ggplotly(plotInputKEGG())  
+    ggplotly(plotInputKEGG(), tooltip = c("y", "x"))
   })
   
   # Download handler for KEGG enrichment plot
   output$downloadkeggplot <- downloadHandler(
-    # Define the filename dynamically based on the selected gene(s)
-    filename = function() { 
-      paste(input$Gene4, 'KEGG_enrichment.pdf', sep = '_')  
-    },
-    
-    # Define the content of the file to be downloaded
-    content = function(file) {
-      ggsave(
-        file,              
-        plotInputKEGG(),   
-        width = 12,        
-        height = 5          
-      )
-    }
+    filename = function() { paste(input$Gene4, 'KEGG_enrichment.pdf', sep = '_') },
+    content  = function(file) { ggsave(file, plotInputKEGG(), width = 12, height = 5) }
   )
+  
   
   #### Server logic for Heatmaps ####
   
@@ -1001,45 +1014,47 @@ server <- function(input, output, session) {
   })
   
   heatmap_data <- reactive({
-    # Reactive function to dynamically generate heatmap data based on user selections.
     req(selected_heatmap_data(), input$genes, input$conditions)
-    selected_genes <- if ("All" %in% input$genes) rownames(selected_heatmap_data()) else input$genes # If the user selects "All" for genes, include all row names from the dataset.
-    selected_conditions <- if ("All" %in% input$conditions) colnames(selected_heatmap_data()) else input$conditions # If the user selects "All" for conditions, include all column names from the dataset.
+    M <- selected_heatmap_data()
     
-    # Inform user if clustering is selected with fewer than 2 genes/conditions
+    # Resolve selections (supports "All") + guard against stale names
+    selected_genes <- if ("All" %in% input$genes) rownames(M) else input$genes
+    selected_conditions <- if ("All" %in% input$conditions) colnames(M) else input$conditions
+    selected_genes <- intersect(selected_genes, rownames(M))
+    selected_conditions <- intersect(selected_conditions, colnames(M))
     
-    data <- selected_heatmap_data()[selected_genes, selected_conditions, drop = FALSE]
-    if (input$cluster_rows && nrow(data) < 2) {
+    validate(
+      need(length(selected_genes) > 0, "No matching genes in this dataset."),
+      need(length(selected_conditions) > 0, "No matching conditions in this dataset.")
+    )
+    
+    data <- M[selected_genes, selected_conditions, drop = FALSE]
+    
+    # Guard rails for clustering
+    if (isTRUE(input$cluster_rows) && nrow(data) < 2) {
       showNotification("Please select at least 2 genes for clustering.", type = "error")
       validate(need(FALSE, "Please select at least 2 genes for clustering."))
     }
-    
-    if (input$cluster_columns && ncol(data) < 2) {
+    if (isTRUE(input$cluster_columns) && ncol(data) < 2) {
       showNotification("Please select at least 2 conditions for clustering.", type = "error")
       validate(need(FALSE, "Please select at least 2 conditions for clustering."))
     }
     
-    # Extract selected data
-    data <- selected_heatmap_data()[selected_genes, selected_conditions, drop = FALSE]
-    
-    # Apply clustering if needed
-    if (input$cluster_rows) {
-      # If the user has selected to cluster rows:
-      row_dist <- dist(data, method = input$distance_metric) # Computes the distance matrix for rows using the user-specified distance metric.
-      row_clust <- hclust(row_dist, method = input$clustering_method)  # Performs hierarchical clustering on the row distance matrix using the user-specified clustering method.
-      data <- data[order.dendrogram(as.dendrogram(row_clust)), ] # Reorders the rows of the data based on the clustering results.
+    # --- Local clustering on the selected subset only ---
+    if (isTRUE(input$cluster_rows)) {
+      row_dist  <- pc_dist(data, method = input$distance_metric, min_prop = 2/3)
+      row_clust <- hclust(row_dist, method = input$clustering_method)
+      data <- data[order.dendrogram(as.dendrogram(row_clust)), , drop = FALSE]
     }
-    
-    if (input$cluster_columns) {
-      # If the user has selected to cluster columns:
-      col_dist <- dist(t(data), method = input$distance_metric)
+    if (isTRUE(input$cluster_columns)) {
+      col_dist  <- pc_dist(t(data), method = input$distance_metric, min_prop = 2/3)
       col_clust <- hclust(col_dist, method = input$clustering_method)
-      data <- data[, order.dendrogram(as.dendrogram(col_clust))]
+      data <- data[, order.dendrogram(as.dendrogram(col_clust)), drop = FALSE]
     }
     
     data
-    # Returns the processed data, either clustered or in its original order, based on user inputs.
   })
+  
   
   # Render an interactive heatmap using Plotly
   output$heatmap_interactive <- renderPlotly({ # Defines a Plotly-based heatmap output that dynamically updates based on reactive heatmap data.
@@ -1083,28 +1098,26 @@ server <- function(input, output, session) {
   # Render a heatmap with dendrograms for clustering
   output$heatmap_dendrogram <- renderPlot({
     req(heatmap_data())
-    # Generate the heatmap using the ComplexHeatmap package
     Heatmap(
-      heatmap_data(), # The matrix or data frame to be visualized in the heatmap.
-      name = "Fitness Score", # Title for the color scale (legend) indicating the fitness scores.
-      # Clustering options
-      cluster_rows = input$cluster_rows, # Enables or disables clustering of rows based on user input.
-      cluster_columns = input$cluster_columns, # Enables or disables clustering of columns based on user input.
-      clustering_distance_rows = input$distance_metric, # Specifies the distance metric (e.g., Euclidean, Manhattan) for row clustering.
-      clustering_distance_columns = input$distance_metric, # Specifies the distance metric for column clustering.
-      clustering_method_rows = input$clustering_method, # Specifies the clustering method (e.g., complete, average, single) for rows.
-      clustering_method_columns = input$clustering_method, # Specifies the clustering method for columns.
-      
-      # Legend customization
+      heatmap_data(),
+      name = "Fitness Score",
+      cluster_rows    = input$cluster_rows,
+      cluster_columns = input$cluster_columns,
+      clustering_distance_rows    = function(x) pc_dist(x,    method = input$distance_metric, min_prop = 2/3),
+      clustering_distance_columns = function(x) pc_dist(t(x), method = input$distance_metric, min_prop = 2/3),
+      clustering_method_rows      = input$clustering_method,
+      clustering_method_columns   = input$clustering_method,
       heatmap_legend_param = list(
-        title_gp = gpar(fontsize = 14), # Sets the font size for the legend title.
-        labels_gp = gpar(fontsize = 13),# the font size for the legend labels.
-        legend_height = unit(4, "cm"), # the height of the legend box.
-        legend_width = unit(3, "cm") #  the width of the legend box.
+        title_gp   = gpar(fontsize = 14),
+        labels_gp  = gpar(fontsize = 13),
+        legend_height = unit(4, "cm"),
+        legend_width  = unit(3, "cm")
       )
     )
   })
   
+  
+
   
   # Render a UI element for selecting a dataset
   output$dataset_selector <- renderUI({ # Dynamically generates a dropdown menu for dataset selection in the UI.
@@ -1137,25 +1150,24 @@ server <- function(input, output, session) {
     filename = function() {
       paste("Dendrogram_Plot_", Sys.Date(), ".pdf", sep = "")
     },
-    
-    # Define the content of the downloaded file
     content = function(file) {
       pdf(file, width = 10, height = 8)
       draw(
         Heatmap(
-          heatmap_data(),                   
-          name = "Fitness Score",           
-          cluster_rows = input$cluster_rows,       
-          cluster_columns = input$cluster_columns, 
-          clustering_distance_rows = input$distance_metric, 
-          clustering_distance_columns = input$distance_metric, 
-          clustering_method_rows = input$clustering_method,   
-          clustering_method_columns = input$clustering_method 
+          heatmap_data(),
+          name = "Fitness Score",
+          cluster_rows    = input$cluster_rows,
+          cluster_columns = input$cluster_columns,
+          clustering_distance_rows    = function(x) pc_dist(x,    method = input$distance_metric, min_prop = 2/3),
+          clustering_distance_columns = function(x) pc_dist(t(x), method = input$distance_metric, min_prop = 2/3),
+          clustering_method_rows      = input$clustering_method,
+          clustering_method_columns   = input$clustering_method
         )
       )
       dev.off()
     }
   )
+  
   
   # Interactive heatmap plot download
   output$downloadInteractiveHeatmapPlot <- downloadHandler(
@@ -1201,7 +1213,1154 @@ server <- function(input, output, session) {
       )
     }
   )
+
   
+ 
+  ######## Server logic for the "S. cerevisiae tab ########
+  
+  # Load key datasets required for the application:
+  sc_scores_file <- readRDS("SC_Score_plus_FDR.rds")  # Fitness scores and False Discovery Rate (FDR) values
+  sc_gene_cor_file <- readRDS("SC_gene_cor.rds")      # Gene correlation data
+  sc_cond_cor_file <- readRDS("SC_cond_cor.rds")      # Condition correlation data
+  sc_go_file <- readRDS("SC_enrich.rds")          # Gene Ontology (GO) enrichment data
+  sc_kegg_file <- readRDS("SC_kegg_enrich.rds")      # KEGG pathway enrichment data
+
+  pryr::mem_used()
+  
+  # Observe block to ensure datasets are loaded before proceeding
+  observe({
+    req(sc_scores_file, sc_gene_cor_file, sc_cond_cor_file, sc_go_file, sc_kegg_file)
+    
+    # Extract unique gene names from the fitness scores file
+    unique_genes <- unique(sc_scores_file$Gene)
+    
+    # Dynamically update the Gene1 dropdown menu in the UI
+    updateSelectizeInput(
+      session,
+      "sc_Gene1",  # The input ID for the Gene1 dropdown
+      choices = unique_genes,  # Populate dropdown with unique gene names
+      selected = if (length(unique_genes) >= 2) unique_genes[1:6] else unique_genes,  # Pre-select up to the first 6 genes if available
+      options = list(
+        placeholder = "Type to search...",  # Add a placeholder guiding users to search for genes
+        maxOptions = length(unique_genes)  # Limit displayed options to the total number of unique genes
+      ),
+      server = TRUE  # Enable server-side processing for better performance with large datasets
+    )
+  
+    # Dynamically update the cond1 dropdown menu in the UI (now same logic as Gene1)
+    unique_conditions <- sort(unique(sc_scores_file$Condition))
+    
+    updateSelectizeInput(
+      session,
+      "sc_cond1",
+      choices = unique_conditions,
+      selected = if (length(unique_conditions) >= 2) unique_conditions[1:6] else unique_conditions,
+      options = list(
+        placeholder = "Type to search...",
+        maxOptions = length(unique_conditions)
+      ),
+      server = TRUE
+    )
+    
+    
+    # Extract unique gene names from the gene correlation dataset (either Gene_1 or Gene_2)
+    unique_genes_cor <- unique(c(sc_gene_cor_file$Gene_1, sc_gene_cor_file$Gene_2))
+    
+    # Dynamically update the Gene2 dropdown menu in the UI
+    updateSelectizeInput(
+      session,
+      "sc_Gene2",  
+      choices = unique_genes_cor,  
+      selected = if (length(unique_genes_cor) >= 2) unique_genes_cor[1:2] else unique_genes_cor,  
+      options = list(
+        placeholder = "Type to search...",  
+        maxOptions = length(unique_genes_cor)  
+      ),
+      server = TRUE  
+    )
+    
+    # Dynamically update the cond2 dropdown menu in the UI
+    updateSelectizeInput(
+      session,
+      "sc_cond2", 
+      choices = unique(sc_cond_cor_file$Condition_1),  
+      selected = c("TETRACYCLINE.0.75", "EGTA 1 MM", "NITRITE.20.MM"),  
+      options = list(
+        placeholder = "Type to search...",  
+        maxOptions = length(unique(sc_cond_cor_file$Condition_1)) 
+      ),
+      server = TRUE  
+    )
+    
+    # Extract unique genes from the Gene column in the GO file
+    unique_genes_go <- unique(sc_go_file$Gene)  
+    
+    # Dynamically update the Gene3 dropdown menu in the UI
+    updateSelectizeInput(
+      session,
+      "sc_Gene3",  
+      choices = unique_genes_go,  
+      selected = if (length(unique_genes_go) >= 2) unique_genes_go[1:2] else unique_genes_go,  
+      options = list(
+        placeholder = "Type to search...",  
+        maxOptions = length(unique_genes_go)  
+      ),
+      server = TRUE  
+    )
+    
+    # Extract unique genes from the Gene column in the KEGG file
+    unique_genes_kegg <- unique(sc_kegg_file$Gene)  
+    
+    # Update the Gene4 dropdown in the UI dynamically
+    updateSelectizeInput(
+      session,
+      "sc_Gene4",  
+      choices = unique_genes_kegg,  
+      selected = if (length(unique_genes_kegg) >= 2) unique_genes_kegg[1:2] else unique_genes_kegg,  
+      options = list(
+        placeholder = "Type to search...",  
+        maxOptions = length(unique_genes_kegg)  
+      ),
+      server = TRUE 
+    )
+    
+  })
+  
+  
+  #### Server logic for Phenotypes of Selected Genes ####
+  
+  sc_Genes_phenotypes <- reactive({
+    req(input$sc_Gene1)  # Ensure that the user has selected at least one gene (Gene1 input must not be NULL)
+    
+    # Filter the scores file to include only rows where the Gene matches the selected input (Gene1)
+    dplyr::filter(sc_scores_file, Gene %in% input$sc_Gene1) %>%
+      # Add a new column 'Fitness' based on the value of Score
+      dplyr::mutate(Fitness = dplyr::case_when(
+        Score > 0 ~ 'Increased',  # If score is greater than 0, label as 'Increased'
+        Score < 0 ~ 'Decreased'   # If score is less than 0, label as 'Decreased'
+      ))
+  })
+  
+  
+  # Render "All Phenotypes" table
+  output$sc_genes_scores_filetable <- DT::renderDataTable({
+    # Create a DataTable using the Genes_phenotypes reactive dataset
+    DT::datatable(
+      sc_Genes_phenotypes(),  # Use the data from the Genes_phenotypes reactive function
+      options = list(
+        pageLength = 10,  # Display 10 rows per page by default
+        scrollX = TRUE    # Enable horizontal scrolling for wide tables
+      ),
+      rownames = FALSE  # Do not display row names in the table
+    )
+  })
+  
+  # Download handler for the "All Phenotypes" table
+  output$sc_downloadAllGenesPhenotypes <- downloadHandler(
+    # Define the filename dynamically with the current date
+    filename = function() { 
+      paste("All_Phenotypes_", Sys.Date(), ".csv", sep = "")  # Format: All_Phenotypes_YYYY-MM-DD.csv
+    },
+    
+    # Define the content of the downloaded file
+    content = function(file) {
+      write.csv(
+        sc_Genes_phenotypes(),  # Use the data from the Genes_phenotypes reactive function
+        file,                # File path provided by the user
+        row.names = FALSE    # Exclude row names from the CSV file for a cleaner output
+      )
+    }
+  )
+  
+  # Reactive function for filtering significant phenotypes
+  sc_Genes_phenotypes_sig <- reactive({
+    sc_Genes_phenotypes() %>%  # Start with the data from the Genes_phenotypes reactive function
+      dplyr::filter(
+        as.numeric(FDR) <= (input$sc_FDRq / 100)  # Filter rows where the FDR is less than or equal to the user-specified threshold
+      )
+  })
+  
+  # Render a table for significant gene scores
+  output$sc_genes_scores_sig_filetable <- DT::renderDataTable({
+    # Create a DataTable using the filtered significant phenotypes dataset
+    DT::datatable(
+      sc_Genes_phenotypes_sig(),  
+      options = list(
+        pageLength = 5,  
+        scrollX = TRUE  
+      ),
+      rownames = FALSE  
+    )
+  })
+  
+  # Reactive function to summarize significant phenotypes data for the bar plot
+  sc_Genes_phenotypes_sig_with_totals <- reactive({
+    sc_Genes_phenotypes_sig() %>%  # Start with the filtered significant phenotypes dataset
+      dplyr::group_by(Gene, Fitness) %>%  # Group data by Dataset and Fitness
+      dplyr::summarise(
+        Count = dplyr::n(),       # Count the number of occurrences in each group
+        .groups = "drop"   # Remove grouping to return a flat data frame
+      ) %>%
+      dplyr::mutate(
+        Fitness = factor(Fitness, levels = c("Decreased", "Increased")),  # Ensure Fitness is a factor with a defined order
+        Gene = forcats::fct_reorder(Gene, Count, .fun = sum)  # order by total count
+      )
+  })
+  
+  
+  # Reactive function to generate the bar plot for significant phenotypes
+  sc_plotInput <- reactive({
+    ggplot(
+      sc_Genes_phenotypes_sig_with_totals(),  # Use the summarized data for significant phenotypes
+      aes(x = Count, y = Gene, fill = Fitness)  # Map Count to x-axis, Dataset to y-axis, and Fitness to fill
+    ) +
+      geom_bar(stat = "identity") +  # Create a bar plot with pre-summarized data
+      scale_fill_manual(
+        values = c("Decreased" = "#d0f0f0", "Increased" = "#238b8e")  # Define custom colors for Fitness levels
+      ) +
+      theme_classic() +  # Apply a clean, classic theme
+      xlab("Count of Phenotypes") +  # Set x-axis label
+      ylab(NULL) +  # Remove y-axis label for a cleaner look
+      theme(
+        axis.text.x = element_text(size = 10),  
+        axis.text.y = element_text(size = 10),  
+        plot.title = element_text(size = 16, face = "bold"),  
+        legend.text = element_text(size = 10),  
+        legend.title = element_text(size = 11)  
+      )
+  })
+  
+  
+  # Download handler for the Significant Phenotypes Genes table
+  output$sc_download <- downloadHandler(
+    # Generate the filename dynamically with the current date
+    filename = function() {
+      paste("Significant_Phenotypes_Genes_", Sys.Date(), ".csv", sep = "")  
+    },
+    
+    # Define the content of the file to be downloaded
+    content = function(fname) {
+      write.csv(
+        sc_Genes_phenotypes_sig(),  
+        fname,                   
+        row.names = FALSE        
+      )
+    }
+  )
+  
+  # Render the interactive bar plot for significant phenotypes
+  output$sc_barplotps <- renderPlotly({
+    dat <- sc_Genes_phenotypes_sig_with_totals()
+    validate(need(nrow(dat) > 0, "No significant phenotypes at this FDR. Try increasing % FDR."))
+    ggplotly(sc_plotInput())
+  })
+  
+  
+  # Download handler for the Significant Phenotypes bar plot
+  output$sc_downloadPlot <- downloadHandler(
+    filename = function() {
+      sel <- input$sc_Gene1
+      lab <- if (length(sel) > 5) paste0(length(sel), "_genes") else paste(sel, collapse = "_")
+      paste0(lab, "_Significant_Phenotypes.pdf")
+    },
+    content = function(file) ggsave(file, sc_plotInput(), width = 8, height = 5)
+  )
+
+  
+  #### Server logic for Phenotypes Conditions #####
+  
+  # Phenotypes of Selected Conditions (ALL)
+  sc_Conditions_phenotypes <- reactive({
+    req(input$sc_cond1)
+    
+    dplyr::filter(sc_scores_file, Condition %in% input$sc_cond1) %>%
+      dplyr::mutate(
+        Fitness = dplyr::case_when(
+          Score > 0 ~ 'Increased',
+          Score < 0 ~ 'Decreased')
+      )
+  })
+  
+  # Render "All Phenotypes" table
+  output$sc_conditions_scores_filetable <- DT::renderDataTable({
+    # Create a DataTable using the Genes_phenotypes reactive dataset
+    DT::datatable(
+      sc_Conditions_phenotypes(),  # Use the data from the Genes_phenotypes reactive function
+      options = list(
+        pageLength = 10,  # Display 10 rows per page by default
+        scrollX = TRUE    # Enable horizontal scrolling for wide tables
+      ),
+      rownames = FALSE  # Do not display row names in the table
+    )
+  })
+  
+  
+  # Download handler for the "All Phenotypes" table
+  output$sc_downloadAllConditionsPhenotypes <- downloadHandler(
+    # Define the filename dynamically with the current date
+    filename = function() { 
+      paste("All_Phenotypes_", Sys.Date(), ".csv", sep = "")  # Format: All_Phenotypes_YYYY-MM-DD.csv
+    },
+    
+    # Define the content of the downloaded file
+    content = function(file) {
+      write.csv(
+        sc_Conditions_phenotypes(),  # Use the data from the Genes_phenotypes reactive function
+        file,                # File path provided by the user
+        row.names = FALSE    # Exclude row names from the CSV file for a cleaner output
+      )
+    }
+  )
+  
+  # Reactive function for filtering significant phenotypes
+  sc_Conditions_phenotypes_sig <- reactive({
+    sc_Conditions_phenotypes() %>%  # Start with the data from the Genes_phenotypes reactive function
+      dplyr::filter(
+        as.numeric(FDR) <= (input$sc_FDRqc / 100)  # Filter rows where the FDR is less than or equal to the user-specified threshold
+      )
+  })
+  
+  # Render a table for significant gene scores
+  output$sc_conditions_scores_sig_filetable <- DT::renderDataTable({
+    # Create a DataTable using the filtered significant phenotypes dataset
+    DT::datatable(
+      sc_Conditions_phenotypes_sig(),  
+      options = list(
+        pageLength = 5,  
+        scrollX = TRUE  
+      ),
+      rownames = FALSE  
+    )
+  })
+  
+  
+  # Reactive function to summarize significant phenotypes data for the bar plot
+  sc_Conditions_phenotypes_sig_with_totals <- reactive({
+    sc_Conditions_phenotypes_sig() %>%  # Start with the filtered significant phenotypes dataset
+      dplyr::group_by(Condition, Fitness) %>%  # Group data by Dataset and Fitness
+      dplyr::summarise(
+        Count = dplyr::n(),       # Count the number of occurrences in each group
+        .groups = "drop"   # Remove grouping to return a flat data frame
+      ) %>%
+      dplyr::mutate(
+        Fitness = factor(Fitness, levels = c("Decreased", "Increased")),  # Ensure Fitness is a factor with a defined order
+        Condition = forcats::fct_reorder(Condition, Count, .fun = sum)  # order by total count
+      )
+  })
+  
+  
+  # Reactive function to generate the bar plot for significant phenotypes
+  sc_plotInputc <- reactive({
+    ggplot(
+      sc_Conditions_phenotypes_sig_with_totals(),  # Use the summarized data for significant phenotypes
+      aes(x = Count, y = Condition, fill = Fitness)  # Map Count to x-axis, Dataset to y-axis, and Fitness to fill
+    ) +
+      geom_bar(stat = "identity") +  # Create a bar plot with pre-summarized data
+      scale_fill_manual(
+        values = c("Decreased" = "#d0f0f0", "Increased" = "#238b8e")  # Define custom colors for Fitness levels
+      ) +
+      theme_classic() +  # Apply a clean, classic theme
+      xlab("Count of Phenotypes") +  # Set x-axis label
+      ylab(NULL) +  # Remove y-axis label for a cleaner look
+      theme(
+        axis.text.x = element_text(size = 10),  
+        axis.text.y = element_text(size = 10),  
+        plot.title = element_text(size = 16, face = "bold"),  
+        legend.text = element_text(size = 10),  
+        legend.title = element_text(size = 11)  
+      )
+  })
+  
+  
+  # Download handler for the Significant Phenotypes table
+  output$sc_downloadc <- downloadHandler(
+    # Generate the filename dynamically with the current date
+    filename = function() {
+      paste("Significant_Phenotypes_Condition_", Sys.Date(), ".csv", sep = "")  
+    },
+    
+    # Define the content of the file to be downloaded
+    content = function(fname) {
+      write.csv(
+        sc_Conditions_phenotypes_sig(),  
+        fname,                   
+        row.names = FALSE        
+      )
+    }
+  )
+  
+  # Render the interactive bar plot for significant phenotypes
+  output$sc_barplotpsc <- renderPlotly({
+    dat <- sc_Conditions_phenotypes_sig_with_totals()
+    validate(need(nrow(dat) > 0, "No significant phenotypes at this FDR. Try increasing % FDR."))
+    ggplotly(sc_plotInputc())
+  })
+  
+  # Download handler for the Significant Phenotypes bar plot
+  output$sc_downloadPlotc <- downloadHandler(
+    filename = function() {
+      sel <- input$sc_cond1
+      lab <- if (length(sel) > 5) paste0(length(sel), "_conditions") else paste(sel, collapse = "_")
+      paste0(lab, "_Significant_Phenotypes_Condition.pdf")
+    },
+    content = function(file) ggsave(file, sc_plotInputc(), width = 8, height = 5)
+  )
+  
+  
+  # Server logic for Genes Correlations
+  
+  # Robust column detection (handles "Correlation (r)", qval/qvalue/FDR)
+  sc_pick_cols <- function(df) {
+    nms <- names(df)
+    first_match <- function(patterns) {
+      for (p in patterns) {
+        hit <- grep(p, nms, ignore.case = TRUE, value = TRUE)
+        if (length(hit)) return(hit[1])
+      }
+      NA_character_
+    }
+    r_name <- first_match(c("^r$", "pearson[_ ]?r$", "correlation\\s*\\(r\\)$", "\\(r\\)$", "^corr(elation)?_?r$"))
+    q_name <- first_match(c("^qval$", "^qvalue$", "^fdr$", "q[_ ]?value"))
+    list(r = r_name, q = q_name, dataset = if ("Dataset" %in% nms) "Dataset" else NULL)
+  }
+  
+  # Normalise yeast correlation table to standard columns used downstream
+  # -> Gene_1, Gene_2, r_num (numeric r), q_num (numeric q/FDR), Correlation (Pos/Neg/Other), Dataset_label
+  sc_norm_sc_gene_cor <- reactive({
+    df <- sc_gene_cor_file
+    cols <- sc_pick_cols(df)
+    
+    if (!all(c("Gene_1", "Gene_2") %in% names(df))) {
+      stop("Yeast gene-correlation file must contain columns 'Gene_1' and 'Gene_2'.")
+    }
+    
+    # numeric r
+    if (is.na(cols$r)) {
+      df$r_num <- NA_real_
+    } else {
+      df$r_num <- suppressWarnings(as.numeric(df[[cols$r]]))
+    }
+    
+    # numeric q
+    if (is.na(cols$q)) {
+      df$q_num <- NA_real_
+    } else {
+      df$q_num <- suppressWarnings(as.numeric(df[[cols$q]]))
+    }
+    
+    # sign label (use existing 'Correlation' if present; else derive from r_num at ±0.4)
+    if (!("Correlation" %in% names(df))) {
+      df$Correlation <- dplyr::case_when(
+        !is.na(df$r_num) & df$r_num >=  0.4 ~ "Positive",
+        !is.na(df$r_num) & df$r_num <= -0.4 ~ "Negative",
+        TRUE ~ "Other"
+      )
+    } else {
+      df$Correlation <- dplyr::case_when(
+        tolower(df$Correlation) == "positive" ~ "Positive",
+        tolower(df$Correlation) == "negative" ~ "Negative",
+        TRUE ~ "Other"
+      )
+    }
+    
+    # dataset label (fallback when missing)
+    df$Dataset_label <- if (!is.null(cols$dataset)) df[[cols$dataset]] else "S. cerevisiae"
+    
+    dplyr::select(df, Gene_1, Gene_2, r_num, q_num, Correlation, Dataset_label, dplyr::everything())
+  })
+  
+  # All correlations for selected Gene_1
+  sc_all_gene_cor <- reactive({
+    req(input$sc_Gene2)
+    sc_norm_sc_gene_cor() %>% dplyr::filter(Gene_1 %in% input$sc_Gene2)
+  })
+  
+  output$sc_genes_correlations_filetable <- DT::renderDataTable({
+    DT::datatable(
+      sc_all_gene_cor() %>% dplyr::select(-r_num, -q_num),  # hide helper cols
+      options = list(pageLength = 10, scrollX = TRUE),
+      rownames = FALSE
+    )
+  })
+  
+  output$sc_downloadAllCorrelations <- downloadHandler(
+    filename = function() paste("Yeast_All_Correlations_", Sys.Date(), ".csv", sep = ""),
+    content  = function(file) write.csv(sc_all_gene_cor(), file, row.names = FALSE)
+  )
+  
+  # Significant correlations by %FDR slider input$sc_FDRq2 (0–100) 
+  sc_sig_gene_cor <- reactive({
+    dat <- sc_all_gene_cor()
+    # If no q-values available, return empty
+    if (all(is.na(dat$q_num))) return(dat[0, , drop = FALSE])
+    thresh <- (if (is.null(input$sc_FDRq2)) 5 else input$sc_FDRq2) / 100
+    dplyr::filter(dat, !is.na(q_num), q_num <= thresh)
+  })
+  
+  output$sc_genes_correlations_sig_filetable <- DT::renderDataTable({
+    dat <- sc_sig_gene_cor()
+    validate(need(nrow(dat) > 0, "No significant correlations at this FDR. Try increasing % FDR or confirm q-values exist."))
+    DT::datatable(
+      dat %>% dplyr::select(-r_num, -q_num),  # hide helper cols
+      options = list(pageLength = 5, scrollX = TRUE),
+      rownames = FALSE
+    )
+  })
+  
+  output$sc_download_gene_cor <- downloadHandler(
+    filename = function() paste("Yeast_Genes_Correlation_", Sys.Date(), ".csv", sep = ""),
+    content  = function(file) write.csv(sc_sig_gene_cor(), file, row.names = FALSE)
+  )
+  
+  # Plot: one bar per selected Gene_1 (stacked by Positive/Negative)
+  sc_plotInputcor <- reactive({
+    dat <- sc_sig_gene_cor()
+    validate(need(nrow(dat) > 0, "No significant correlations at this FDR. Try increasing % FDR."))
+    
+    dat <- dat %>% dplyr::filter(Correlation %in% c("Positive", "Negative"))
+    
+    # order genes by total significant count (ascending for nicer y-axis)
+    gene_order <- dat %>%
+      dplyr::count(Gene_1, name = "Total") %>%
+      dplyr::arrange(Total) %>%
+      dplyr::pull(Gene_1)
+    
+    dat$Gene_1 <- factor(dat$Gene_1, levels = gene_order)
+    
+    ggplot(dat, aes(y = Gene_1, fill = Correlation)) +
+      geom_bar(stat = "count") +
+      scale_fill_manual(values = c("Positive" = "#08589e", "Negative" = "#edf8fb")) +
+      ylab(NULL) +
+      xlab("Count of Pearson r values > 0.4 or < -0.4 (significant by FDR)") +
+      theme_classic() +
+      theme(
+        axis.text.x = element_text(size = 10),
+        axis.text.y = element_text(size = 10),
+        legend.text  = element_text(size = 10),
+        legend.title = element_text(size = 11),
+        axis.title.x = element_text(size = 11),
+        plot.title   = element_text(size = 16, face = "bold")
+      )
+  })
+  
+  # Safe ggplotly wrapper
+  safe_plotly_sc <- function(p) {
+    tryCatch(
+      plotly::ggplotly(p, tooltip = c("y", "x", "fill")),
+      error = function(e) {
+        plotly::plot_ly() %>% layout(annotations = list(
+          text = paste("Plot error:", e$message),
+          showarrow = FALSE, x = 0.5, y = 0.5, xref = "paper", yref = "paper"
+        ))
+      }
+    )
+  }
+  
+  output$sc_barplot  <- plotly::renderPlotly({ safe_plotly_sc(sc_plotInputcor()) })
+  output$sc_barplot2 <- plotly::renderPlotly({ safe_plotly_sc(sc_plotInputcor()) })
+  
+  output$sc_downloadcorplot <- downloadHandler(
+    filename = function() {
+      sel <- input$sc_Gene2
+      lab <- if (length(sel) > 5) paste0(length(sel), "_genes") else paste(sel, collapse = "_")
+      paste0(lab, "_Genes_Correlation.pdf")
+    },
+    content = function(file) ggsave(file, sc_plotInputcor(), width = 8, height = 5)
+  )
+
+    # Server logic for Condition Correlations
+
+  # All available conditions (from either side of the pair table)
+  cond_choices <- reactive({
+    df <- sc_cond_cor_file
+    if (is.null(df) || !all(c("Condition_1","Condition_2") %in% names(df))) return(character(0))
+    sort(unique(c(df$Condition_1, df$Condition_2)))
+  })
+  
+  # Auto-select a few default conditions on load / when dataset changes
+  observeEvent(cond_choices(), {
+    choices <- cond_choices()
+    
+    # keep user's current picks if they exist in new choices; otherwise pick first few
+    current <- isolate(input$sc_cond2)
+    selected <- if (!is.null(current) && length(current) > 0) {
+      intersect(current, choices)
+    } else {
+      head(choices, min(5, length(choices)))  # default: first 5 (or fewer)
+    }
+    
+    updateSelectizeInput(
+      session, "sc_cond2",
+      choices  = choices,
+      selected = selected,
+      server   = TRUE
+    )
+  }, ignoreInit = FALSE)
+  
+  # Condition_1, Condition_2, r_num, q_num, Correlation (Pos/Neg/Other), Dataset_label
+  sc_norm_sc_cond_cor <- reactive({
+    df <- sc_cond_cor_file                 # your loaded condition-correlation df
+    cols <- sc_pick_cols(df)               # re-use your robust picker (r/q/dataset)
+    
+    # sanity check
+    if (!all(c("Condition_1", "Condition_2") %in% names(df))) {
+      stop("Condition correlation file must contain columns 'Condition_1' and 'Condition_2'.")
+    }
+    
+    # numeric r
+    if (is.na(cols$r)) {
+      df$r_num <- NA_real_
+    } else {
+      df$r_num <- suppressWarnings(as.numeric(df[[cols$r]]))
+    }
+    
+    # numeric q
+    if (is.na(cols$q)) {
+      df$q_num <- NA_real_
+    } else {
+      df$q_num <- suppressWarnings(as.numeric(df[[cols$q]]))
+    }
+    
+    # sign label (use existing 'Correlation' if present; else derive from r_num at ±0.4)
+    if (!("Correlation" %in% names(df))) {
+      df$Correlation <- dplyr::case_when(
+        !is.na(df$r_num) & df$r_num >=  0.4 ~ "Positive",
+        !is.na(df$r_num) & df$r_num <= -0.4 ~ "Negative",
+        TRUE ~ "Other"
+      )
+    } else {
+      df$Correlation <- dplyr::case_when(
+        tolower(df$Correlation) == "positive" ~ "Positive",
+        tolower(df$Correlation) == "negative" ~ "Negative",
+        TRUE ~ "Other"
+      )
+    }
+    
+    # dataset label (fallback)
+    df$Dataset_label <- if (!is.null(cols$dataset)) df[[cols$dataset]] else "S. cerevisiae"
+    
+    # (optional) if your upstream saved "N_shared" (overlap size), keep it; else ignore
+    dplyr::select(df, Condition_1, Condition_2, r_num, q_num, Correlation, Dataset_label, dplyr::everything())
+  })
+  
+  # All correlations for selected Condition_1 (mirror of sc_all_gene_cor) 
+  sc_all_cond_cor <- reactive({
+    req(input$sc_cond2)
+    sc_norm_sc_cond_cor() %>% dplyr::filter(Condition_1 %in% input$sc_cond2)
+  })
+  
+  output$sc_conditions_correlations_filetable <- DT::renderDataTable({
+    DT::datatable(
+      sc_all_cond_cor() %>% dplyr::select(-r_num, -q_num),   # hide helper cols like you do for genes
+      options = list(pageLength = 10, scrollX = TRUE),
+      rownames = FALSE
+    )
+  })
+  
+  output$sc_downloadAllCondCorrelations <- downloadHandler(
+    filename = function() paste("All_Condition_Correlations_", Sys.Date(), ".csv", sep = ""),
+    content  = function(file) write.csv(sc_all_cond_cor(), file, row.names = FALSE)
+  )
+  
+  # Significant condition correlations by %FDR (mirror of sc_sig_gene_cor) 
+  sc_condsig <- reactive({
+    dat <- sc_all_cond_cor()
+    if (all(is.na(dat$q_num))) return(dat[0, , drop = FALSE])     # no q-values available
+    thresh <- (if (is.null(input$sc_FDRq3)) 5 else input$sc_FDRq3) / 100
+    dplyr::filter(dat, !is.na(q_num), q_num <= thresh)
+  })
+  
+  output$sc_conditions_correlations_sig_filetable <- DT::renderDataTable({
+    dat <- sc_condsig()
+    validate(need(nrow(dat) > 0, "No significant correlations at this FDR. Try increasing % FDR or confirm q-values exist."))
+    DT::datatable(
+      dat %>% dplyr::select(-r_num, -q_num),
+      options = list(pageLength = 5, scrollX = TRUE),
+      rownames = FALSE
+    )
+  })
+  
+  output$sc_download_cond_cor <- downloadHandler(
+    filename = function() paste("Conditions_Correlation_", Sys.Date(), ".csv", sep = ""),
+    content  = function(fname) write.csv(sc_condsig(), fname, row.names = FALSE)
+  )
+  
+  # Plot: one bar per selected Condition_1 (stacked by Positive/Negative)
+  sc_plotInputcor_cond <- reactive({
+    dat <- sc_condsig()
+    validate(need(nrow(dat) > 0, "No significant correlations at this FDR. Try increasing % FDR."))
+    
+    dat <- dat %>% dplyr::filter(Correlation %in% c("Positive", "Negative"))
+    
+    # order conditions by total significant count (ascending for nicer y-axis)
+    cond_order <- dat %>%
+      dplyr::count(Condition_1, name = "Total") %>%
+      dplyr::arrange(Total) %>%
+      dplyr::pull(Condition_1)
+    
+    dat$Condition_1 <- factor(dat$Condition_1, levels = cond_order)
+    
+    ggplot(dat, aes(y = Condition_1, fill = Correlation)) +
+      geom_bar(stat = "count") +
+      scale_fill_manual(values = c("Positive" = "#756bb1", "Negative" = "#dadaeb")) +
+      ylab(NULL) +
+      xlab("Count of Pearson r values > 0.4 or < -0.4 (significant by FDR)") +
+      theme_classic() +
+      theme(
+        axis.text.x = element_text(size = 10),
+        axis.text.y = element_text(size = 10),
+        legend.text  = element_text(size = 10),
+        legend.title = element_text(size = 11),
+        axis.title.x = element_text(size = 11),
+        plot.title   = element_text(size = 16, face = "bold")
+      )
+  })
+  
+  output$sc_barplot2 <- plotly::renderPlotly({
+    safe_plotly_sc(sc_plotInputcor_cond())   # reuse your safe wrapper
+  })
+  
+  output$sc_downloadcorplot2 <- downloadHandler(
+    filename = function() {
+      sel <- input$sc_cond2
+      lab <- if (length(sel) > 5) paste0(length(sel), "_conditions") else paste(sel, collapse = "_")
+      paste0(lab, "_Conditions_Correlation.pdf")
+    },
+    content = function(file) ggsave(file, sc_plotInputcor_cond(), width = 8, height = 5)
+  )
+  
+  #### Server logic for GO Enrichment ####
+
+  #### ---------------- GO Enrichment (FINAL colorful version) ---------------- ####
+  
+  # Normalise once (qvalue -> numeric)
+  sc_go_norm <- reactive({
+    df <- sc_go_file
+    stopifnot(all(c("Gene","ID","Description","qvalue","Count") %in% names(df)))
+    df %>% dplyr::mutate(qvalue_num = suppressWarnings(as.numeric(qvalue)))
+  })
+  
+  # All GO enrichment for selected genes
+  sc_all_go <- reactive({
+    req(input$sc_Gene3)
+    sc_go_norm() %>% dplyr::filter(Gene %in% input$sc_Gene3)
+  })
+  
+  # Filter significant terms by FDR slider
+  sc_sig_go <- reactive({
+    thr <- (if (is.null(input$sc_FDRq4)) 100 else input$sc_FDRq4) / 100
+    sc_all_go() %>% dplyr::filter(!is.na(qvalue_num), qvalue_num <= thr)
+  })
+  
+  # Tables + downloads
+  output$sc_filetableGO <- DT::renderDataTable({
+    DT::datatable(sc_all_go(), options = list(pageLength = 10, scrollX = TRUE), rownames = FALSE)
+  })
+  output$sc_downloadgo <- downloadHandler(
+    filename = function() paste("All_GO_Enrichment_", Sys.Date(), ".csv", sep = ""),
+    content  = function(file) write.csv(sc_all_go(), file, row.names = FALSE)
+  )
+  
+  output$sc_filetableGOs <- DT::renderDataTable({
+    dat <- sc_sig_go()
+    validate(need(nrow(dat) > 0, "No significant GO terms at this FDR. Try increasing % FDR."))
+    DT::datatable(dat, options = list(pageLength = 5, scrollX = TRUE), rownames = FALSE)
+  })
+  output$sc_downloadgos <- downloadHandler(
+    filename = function() "GO_enrichment.csv",
+    content  = function(fname) write.csv(sc_sig_go(), fname, row.names = FALSE)
+  )
+  
+  # Plot dataframe
+  sc_go_plotdf <- reactive({
+    dat <- sc_sig_go()
+    validate(need(nrow(dat) > 0, "No significant GO terms at this FDR. Try increasing % FDR."))
+    
+    df <- dat %>%
+      dplyr::distinct(ID, Description, Gene, Count, qvalue_num, .keep_all = TRUE) %>%
+      dplyr::group_by(Description) %>%
+      dplyr::summarise(
+        N_genes   = dplyr::n_distinct(Gene),
+        TermCount = suppressWarnings(max(Count, na.rm = TRUE)),
+        q_best    = suppressWarnings(min(qvalue_num, na.rm = TRUE)),
+        .groups   = "drop"
+      ) %>%
+      dplyr::mutate(
+        ShortDesc = stringr::str_extract(Description, "^[^,]+"),
+        Score     = -log10(pmax(q_best, .Machine$double.xmin))
+      ) %>%
+      dplyr::filter(Score > 0) %>%
+      dplyr::mutate(ShortDesc = forcats::fct_reorder(ShortDesc, Score))
+    
+    validate(need(nrow(df) > 0, "All remaining GO terms have ~zero height. Tighten FDR or switch metric."))
+    df
+  })
+  
+  # Colorful barplot (distinct fill per term)
+  sc_plotInputGO <- reactive({
+    df <- sc_go_plotdf()
+    ggplot(df, aes(x = Score, y = ShortDesc, fill = ShortDesc)) +
+      geom_col(width = 0.8, colour = "grey30", linewidth = 0.15) +
+      scale_fill_manual(
+        values = colorRampPalette(RColorBrewer::brewer.pal(8, "Set3"))(n_distinct(df$ShortDesc))
+      ) +
+      ylab(NULL) +
+      xlab(expression(-log[10](q))) +
+      scale_x_continuous(expand = expansion(mult = c(0, 0.05))) +
+      theme_classic() +
+      theme(
+        axis.text.x  = element_text(size = 10),
+        axis.text.y  = element_text(size = 10),
+        axis.title.x = element_text(size = 11),
+        legend.position = "none"
+      )
+  })
+  
+  output$sc_barplotGO <- plotly::renderPlotly({
+    plotly::ggplotly(sc_plotInputGO(), tooltip = c("y","x"))
+  })
+  
+  output$sc_downloadgoplot <- downloadHandler(
+    filename = function() {
+      sel <- input$sc_Gene3
+      lab <- if (length(sel) > 5) paste0(length(sel), "_genes") else paste(sel, collapse = "_")
+      paste0(lab, "_GO_enrichment.pdf")
+    },
+    content = function(file) ggsave(file, sc_plotInputGO(), width = 12, height = 5)
+  )
+
+  
+  #### Server logic for KEGG Enrichment ####
+  
+  #### ---------------- KEGG Enrichment (colorful, matches GO style) ---------------- ####
+  
+  # Normalize once (qvalue -> numeric)
+  sc_kegg_norm <- reactive({
+    df <- sc_kegg_file
+    stopifnot(all(c("Gene","ID","Description","qvalue","Count") %in% names(df)))
+    df %>% dplyr::mutate(qvalue_num = suppressWarnings(as.numeric(qvalue)))
+  })
+  
+  # All KEGG enrichment for selected genes
+  sc_all_kegg <- reactive({
+    req(input$sc_Gene4)
+    sc_kegg_norm() %>% dplyr::filter(Gene %in% input$sc_Gene4)
+  })
+  
+  # Filter significant pathways by FDR slider
+  sc_sig_kegg <- reactive({
+    thr <- (if (is.null(input$sc_FDRq5)) 100 else input$sc_FDRq5) / 100
+    sc_all_kegg() %>% dplyr::filter(!is.na(qvalue_num), qvalue_num <= thr)
+  })
+  
+  # Tables + downloads
+  output$sc_filetableKEGG <- DT::renderDataTable({
+    DT::datatable(sc_all_kegg(), options = list(pageLength = 10, scrollX = TRUE), rownames = FALSE)
+  })
+  output$sc_downloadkegg <- downloadHandler(
+    filename = function() paste("All_KEGG_Enrichment_", Sys.Date(), ".csv", sep = ""),
+    content  = function(file) write.csv(sc_all_kegg(), file, row.names = FALSE)
+  )
+  
+  output$sc_filetableKEGGs <- DT::renderDataTable({
+    dat <- sc_sig_kegg()
+    validate(need(nrow(dat) > 0, "No significant KEGG pathways at this FDR. Try increasing % FDR."))
+    DT::datatable(dat, options = list(pageLength = 5, scrollX = TRUE), rownames = FALSE)
+  })
+  output$sc_downloadkeggs <- downloadHandler(
+    filename = function() paste("KEGG_enrichment_", Sys.Date(), ".csv", sep = ""),
+    content  = function(fname) write.csv(sc_sig_kegg(), fname, row.names = FALSE)
+  )
+  
+  # Plot dataframe (one bar per pathway; height = -log10(min q) across selected genes)
+  sc_kegg_plotdf <- reactive({
+    dat <- sc_sig_kegg()
+    validate(need(nrow(dat) > 0, "No significant KEGG pathways at this FDR. Try increasing % FDR."))
+    
+    df <- dat %>%
+      dplyr::distinct(ID, Description, Gene, Count, qvalue_num, .keep_all = TRUE) %>%
+      dplyr::group_by(Description) %>%
+      dplyr::summarise(
+        N_genes   = dplyr::n_distinct(Gene),
+        PathCount = suppressWarnings(max(Count, na.rm = TRUE)),
+        q_best    = suppressWarnings(min(qvalue_num, na.rm = TRUE)),
+        .groups   = "drop"
+      ) %>%
+      dplyr::mutate(
+        ShortDesc = Description,  # keep full KEGG names (usually concise)
+        Score     = -log10(pmax(q_best, .Machine$double.xmin))
+      ) %>%
+      dplyr::filter(Score > 0) %>%
+      dplyr::mutate(ShortDesc = forcats::fct_reorder(ShortDesc, Score))
+    
+    validate(need(nrow(df) > 0, "All remaining KEGG pathways have ~zero height. Tighten FDR or switch metric."))
+    df
+  })
+  
+  # Colorful barplot (distinct fill per pathway)
+  sc_plotInputKEGG <- reactive({
+    df <- sc_kegg_plotdf()
+    
+    # Palette built from final factor levels (prevents color/label mismatch)
+    labs <- levels(df$ShortDesc)
+    pal  <- colorRampPalette(RColorBrewer::brewer.pal(8, "Set3"))(length(labs))
+    names(pal) <- labs
+    
+    ggplot(df, aes(x = Score, y = ShortDesc, fill = ShortDesc)) +
+      geom_col(width = 0.8, colour = "grey30", linewidth = 0.15) +
+      scale_fill_manual(values = pal) +
+      ylab(NULL) +
+      xlab(expression(-log[10](q))) +
+      scale_x_continuous(expand = expansion(mult = c(0, 0.05))) +
+      theme_classic() +
+      theme(
+        axis.text.x  = element_text(size = 10),
+        axis.text.y  = element_text(size = 10),
+        axis.title.x = element_text(size = 11),
+        legend.position = "none"
+      )
+  })
+  
+  output$sc_barplotKEGG <- plotly::renderPlotly({
+    plotly::ggplotly(sc_plotInputKEGG(), tooltip = c("y","x"))
+  })
+  
+  output$sc_downloadkeggplot <- downloadHandler(
+    filename = function() {
+      sel <- input$sc_Gene4
+      lab <- if (length(sel) > 5) paste0(length(sel), "_genes") else paste(sel, collapse = "_")
+      paste0(lab, "_KEGG_enrichment.pdf")
+    },
+    content = function(file) ggsave(file, sc_plotInputKEGG(), width = 12, height = 5)
+  )
+  
+  #### ---------------- End KEGG Enrichment ---------------- ####
+  
+  
+  
+  #### Server logic for Heatmaps ####
+
+  #### ---------------- Yeast Heatmap (Mutant-level) — FINAL ---------------- ####
+  
+  # Helper to compact the strain for row labels
+  short_strain <- function(s) {
+    s <- as.character(s)
+    first <- sub("__.*$", "", s)                          # before first "__"
+    tail6 <- substr(s, pmax(1, nchar(s) - 5), nchar(s))   # last 6 chars
+    paste0(first, "…", tail6)
+  }
+  
+  # 0) Load mutant-level wide table (Mutant_ID, Strain, Gene, <conditions...>)
+  sc_heatmap_tbl <- readRDS("SC_heatmap_mutant_x_condition.rds")
+  
+  # Defensive checks
+  stopifnot(all(c("Mutant_ID","Strain","Gene") %in% names(sc_heatmap_tbl)))
+  
+  # Identify columns
+  .meta_cols <- intersect(c("Mutant_ID","Strain","Gene"), colnames(sc_heatmap_tbl))
+  .cond_cols <- setdiff(colnames(sc_heatmap_tbl), .meta_cols)
+  
+  # 1) Build numeric matrix: rows = Mutant_ID, cols = Conditions
+  sc_heatmap_mat <- as.matrix(sc_heatmap_tbl[, .cond_cols, drop = FALSE])
+  rownames(sc_heatmap_mat) <- sc_heatmap_tbl$Mutant_ID
+  
+  # 2) Selectors (Mutants from table, Conditions from matrix)
+  output$sc_gene_selector <- renderUI({
+    muts <- unique(sc_heatmap_tbl$Mutant_ID)
+    muts <- muts[!is.na(muts)]
+    muts <- sort(muts)
+    
+    validate(need(length(muts) > 0, "No mutants found in the heatmap table."))
+    
+    selectInput(
+      inputId  = "sc_genes",
+      label    = "Select or Type Mutants:",
+      choices  = c("All", muts),
+      multiple = TRUE,
+      selected = head(muts, 7)
+    )
+  })
+  
+  output$sc_condition_selector <- renderUI({
+    conds <- colnames(sc_heatmap_mat)
+    selectInput(
+      inputId  = "sc_conditions",
+      label    = "Select or Type Conditions:",
+      choices  = c("All", conds),
+      multiple = TRUE,
+      selected = head(conds, 15)
+    )
+  })
+  
+  # 3) Reactive: subset + optional local clustering
+  sc_heatmap_data <- reactive({
+    req(input$sc_genes, input$sc_conditions)
+    M <- sc_heatmap_mat
+    
+    rows <- if ("All" %in% input$sc_genes) rownames(M) else intersect(input$sc_genes, rownames(M))
+    cols <- if ("All" %in% input$sc_conditions) colnames(M) else intersect(input$sc_conditions, colnames(M))
+    
+    validate(
+      need(length(rows) > 0, "No matching mutants."),
+      need(length(cols) > 0, "No matching conditions.")
+    )
+    
+    data <- M[rows, cols, drop = FALSE]
+    
+    # Optional clustering on the selected subset only
+    if (isTRUE(input$sc_cluster_rows) && nrow(data) >= 2) {
+      rd <- pc_dist(data, method = input$sc_distance_metric, min_prop = 2/3)
+      rc <- hclust(rd, method = input$sc_clustering_method)
+      data <- data[order.dendrogram(as.dendrogram(rc)), , drop = FALSE]
+    }
+    if (isTRUE(input$sc_cluster_columns) && ncol(data) >= 2) {
+      cd <- pc_dist(t(data), method = input$sc_distance_metric, min_prop = 2/3)
+      cc <- hclust(cd, method = input$sc_clustering_method)
+      data <- data[, order.dendrogram(as.dendrogram(cc)), drop = FALSE]
+    }
+    
+    data
+  })
+  
+  # 4) Interactive heatmap (with Strain/Gene metadata in hover)
+  # 4) Interactive heatmap (unique y = Mutant_ID; show short labels; full hover)
+  output$sc_heatmap_interactive <- renderPlotly({
+    req(sc_heatmap_data())
+    
+    df <- sc_heatmap_data() %>%
+      as.data.frame() %>%
+      tibble::rownames_to_column("Mutant_ID") %>%
+      reshape2::melt(id.vars = "Mutant_ID", variable.name = "Condition", value.name = "Fitness")
+    
+    meta <- sc_heatmap_tbl[, c("Mutant_ID","Strain","Gene")]
+    df   <- dplyr::left_join(df, meta, by = "Mutant_ID")
+    
+    # Map Mutant_ID -> "GENE · short(Strain)" (keeps rows unique, labels short)
+    label_map <- df %>%
+      dplyr::distinct(Mutant_ID, Gene, Strain) %>%
+      dplyr::mutate(Short = ifelse(is.na(Gene) | Gene == "", Mutant_ID,
+                                   paste0(Gene, " · ", short_strain(Strain)))) %>%
+      { setNames(.$Short, .$Mutant_ID) }
+    
+    p <- ggplot(
+      df,
+      aes(
+        x = Condition, y = Mutant_ID, fill = Fitness,
+        text = paste0(
+          "Mutant: ", Mutant_ID,
+          "<br>Strain: ", Strain,
+          "<br>Gene: ", Gene,
+          "<br>Condition: ", Condition,
+          "<br>Fitness: ", signif(Fitness, 4)
+        )
+      )
+    ) +
+      geom_tile() +
+      scale_y_discrete(labels = label_map) +   # <-- short, unique labels shown
+      scale_fill_viridis_c() +
+      theme_minimal() +
+      labs(x = NULL, y = NULL, fill = "Fitness Score") +
+      theme(axis.text.x = element_text(angle = 90, hjust = 1))
+    
+    ggplotly(p, tooltip = "text") %>%
+      layout(xaxis = list(tickangle = 90))
+  })
+  
+  
+  # 5) Static dendrogram heatmap (ComplexHeatmap)
+  # ---- 5) Static dendrogram heatmap (short, unique row labels, readable font) ----
+  output$sc_heatmap_dendrogram <- renderPlot({
+    req(sc_heatmap_data())
+    
+    # Build label map once: Mutant_ID -> "GENE · short(Strain)"
+    lab_df <- sc_heatmap_tbl[, c("Mutant_ID","Strain","Gene")]
+    lab_df$Short <- ifelse(is.na(lab_df$Gene) | lab_df$Gene == "",
+                           lab_df$Mutant_ID,
+                           paste0(lab_df$Gene, " · ", short_strain(lab_df$Strain)))
+    lab_map <- setNames(lab_df$Short, lab_df$Mutant_ID)
+    
+    rn <- rownames(sc_heatmap_data())
+    row_labels <- lab_map[rn]
+    row_labels[is.na(row_labels) | row_labels == ""] <- rn  # fallback
+    
+    Heatmap(
+      sc_heatmap_data(),
+      name = "Fitness Score",
+      row_labels = row_labels,
+      row_names_gp = grid::gpar(fontsize = 12),   # ⬅️ Increased font size here
+      column_names_gp = grid::gpar(fontsize = 12), # ⬅️ Optional: make condition names bigger too
+      cluster_rows    = input$sc_cluster_rows,
+      cluster_columns = input$sc_cluster_columns,
+      clustering_distance_rows    = function(x) pc_dist(x,    method = input$sc_distance_metric, min_prop = 2/3),
+      clustering_distance_columns = function(x) pc_dist(t(x), method = input$sc_distance_metric, min_prop = 2/3),
+      clustering_method_rows      = input$sc_clustering_method,
+      clustering_method_columns   = input$sc_clustering_method,
+      heatmap_legend_param = list(
+        title_gp = grid::gpar(fontsize = 12, fontface = "bold"),
+        labels_gp = grid::gpar(fontsize = 12)
+      )
+    )
+  })
+  
+  
+  
+  # 6) Downloads (include metadata in the CSV)
+  output$sc_downloadHeatmapData <- downloadHandler(
+    filename = function() paste("Heatmap_Data_", Sys.Date(), ".csv", sep = ""),
+    content  = function(file) {
+      mat <- sc_heatmap_data()
+      out <- as.data.frame(mat) %>% tibble::rownames_to_column("Mutant_ID")
+      out <- dplyr::left_join(out, sc_heatmap_tbl[, c("Mutant_ID","Strain","Gene")], by = "Mutant_ID")
+      out <- dplyr::select(out, Mutant_ID, Strain, Gene, dplyr::everything())
+      write.csv(out, file, row.names = FALSE)
+    }
+  )
+  
+  output$sc_downloadDendrogramPlot <- downloadHandler(
+    filename = function() paste("Dendrogram_Plot_", Sys.Date(), ".pdf", sep = ""),
+    content  = function(file) {
+      pdf(file, width = 10, height = 8)
+      draw(
+        Heatmap(
+          sc_heatmap_data(),
+          name = "Fitness Score",
+          cluster_rows    = input$sc_cluster_rows,
+          cluster_columns = input$sc_cluster_columns,
+          clustering_distance_rows    = function(x) pc_dist(x,    method = input$sc_distance_metric, min_prop = 2/3),
+          clustering_distance_columns = function(x) pc_dist(t(x), method = input$sc_distance_metric, min_prop = 2/3),
+          clustering_method_rows      = input$sc_clustering_method,
+          clustering_method_columns   = input$sc_clustering_method
+        )
+      )
+      dev.off()
+    }
+  )
+  
+  output$sc_downloadInteractiveHeatmapPlot <- downloadHandler(
+    filename = function() paste("Interactive_Heatmap_Plot_", Sys.Date(), ".pdf", sep = ""),
+    content  = function(file) {
+      df <- sc_heatmap_data() %>%
+        as.data.frame() %>%
+        tibble::rownames_to_column("Mutant_ID") %>%
+        reshape2::melt(id.vars = "Mutant_ID", variable.name = "Condition", value.name = "Fitness")
+      
+      meta <- sc_heatmap_tbl[, c("Mutant_ID","Strain","Gene")]
+      df   <- dplyr::left_join(df, meta, by = "Mutant_ID")
+      
+      p <- ggplot(df, aes(x = Condition, y = Mutant_ID, fill = Fitness)) +
+        geom_tile() +
+        scale_fill_viridis_c() +
+        theme_minimal() +
+        labs(x = NULL, y = NULL, fill = "Fitness Score") +
+        theme(axis.text.x = element_text(angle = 90, hjust = 1))
+      
+      ggsave(file, plot = p, width = 10, height = 8, dpi = 300)
+    }
+  )
+
+  
+  
+  #server yeast ends here
   ######## Server logic for the "Upload Your Dataset" tab ########
   
   # Reactive function to read the uploaded dataset
@@ -1242,6 +2401,62 @@ server <- function(input, output, session) {
     # MAD = median(|data - median(data)|) / c
     return(median(abs(data - median_val)) / c)
   }
+  
+  # Function to compute Median Absolute Deviation (MAD)
+  compute_mad <- function(data, c = 0.6745) {
+    data <- na.omit(data)
+    median_val <- median(data)
+    median(abs(data - median_val)) / c
+  }
+  
+  # >>> ADD THE HELPER RIGHT HERE <<<
+  pc_dist <- function(M,
+                      method = c("euclidean","manhattan","pearson","spearman","cosine"),
+                      min_prop = 2/3, min_n = NULL) {
+    method  <- match.arg(method)
+    M       <- as.matrix(M)
+    m       <- nrow(M); p <- ncol(M)
+    if (is.null(min_n)) min_n <- max(1, floor(min_prop * p))
+    ok <- !is.na(M)
+    
+    if (method %in% c("pearson","spearman")) {
+      R <- suppressWarnings(cor(t(M), use = "pairwise.complete.obs", method = method))
+      N <- tcrossprod(ok)
+      R[N < min_n] <- NA_real_
+      D <- as.dist(1 - R)
+      if (any(is.na(D))) stop("Not enough overlap to compute all pairwise correlations.")
+      return(D)
+    }
+    
+    if (method == "cosine") {
+      S <- matrix(NA_real_, m, m); diag(S) <- 1
+      for (i in 1:m) for (j in i:m) {
+        idx <- which(ok[i,] & ok[j,])
+        if (length(idx) < min_n) next
+        xi <- M[i, idx]; xj <- M[j, idx]
+        denom <- sqrt(sum(xi^2)) * sqrt(sum(xj^2))
+        sim <- if (denom > 0) sum(xi * xj) / denom else NA_real_
+        S[i,j] <- S[j,i] <- sim
+      }
+      D <- as.dist(1 - S)
+      if (any(is.na(D))) stop("Not enough overlap to compute all cosine distances.")
+      return(D)
+    }
+    
+    # euclidean / manhattan with pairwise-complete overlap
+    Dmat <- matrix(NA_real_, m, m); diag(Dmat) <- 0
+    for (i in 1:m) for (j in i:m) {
+      idx <- which(ok[i,] & ok[j,])
+      if (length(idx) < min_n) next
+      xi <- M[i, idx]; xj <- M[j, idx]
+      d <- if (method == "euclidean") sqrt(sum((xi - xj)^2)) else sum(abs(xi - xj))
+      Dmat[i,j] <- Dmat[j,i] <- d
+    }
+    D <- as.dist(Dmat)
+    if (any(is.na(D))) stop("Not enough overlap to compute all distances.")
+    D
+  }
+  
   
   # Compute FDR results when a dataset is uploaded
   fdr_results <- reactive({
@@ -1577,55 +2792,38 @@ server <- function(input, output, session) {
   # Gene Correlation Analysis 
   
   #### Reactive Function to Generate Correlation Dataset ####
+
   gene_correlation <- reactive({
-    shinyjs::show("loading_gene_corr") # Show loading indicator for gene correlation analysis
-    on.exit(shinyjs::hide("loading_gene_corr")) # Hide loading indicator when function finishes executing
-    Scored_Dataset <- dataset() # Retrieve the dataset to be used for correlation analysis
-    # Ensure the dataset is numeric; if not, stop execution and show an error
-    if (!all(sapply(Scored_Dataset, is.numeric))) {
-      stop("Correlation analysis requires a numeric dataset.")
-    }
+    shinyjs::show("loading_gene_corr"); on.exit(shinyjs::hide("loading_gene_corr"))
+    Scored_Dataset <- dataset()
+    if (!all(sapply(Scored_Dataset, is.numeric))) stop("Correlation analysis requires a numeric dataset.")
     
-    # Handle missing values: replace NAs with the median of the entire dataset
-    Scored_Dataset[is.na(Scored_Dataset)] <- median(as.numeric(unlist(Scored_Dataset)), na.rm = TRUE)
+    gene_mat <- t(as.matrix(Scored_Dataset))  # keep NAs; rcorr uses pairwise-complete
     
-    # Transpose the dataset to compute correlations across genes (columns as genes)
-    gene_cor <- t(as.matrix(Scored_Dataset))
+    rc <- Hmisc::rcorr(gene_mat, type = "pearson")
+    R <- rc$r; P <- rc$P; N <- rc$n
     
-    # Compute Pearson correlation coefficients and p-values using Hmisc::rcorr
-    rcorr_results <- rcorr(as.matrix(gene_cor), type = "pearson")
+    Q <- matrix(p.adjust(as.vector(P), method = "fdr"),
+                nrow = nrow(P), ncol = ncol(P), dimnames = dimnames(P))
     
-    # Extract the correlation matrix (r-values) and p-value matrix from rcorr results
-    gene_cor_matrix <- rcorr_results$r
-    gene_p_matrix <- rcorr_results$P
+    df_r <- reshape2::melt(R, varnames = c("Gene_1","Gene_2"), value.name = "Correlation (r)")
+    df_q <- reshape2::melt(Q, varnames = c("Gene_1","Gene_2"), value.name = "qval")
+    df_n <- reshape2::melt(N, varnames = c("Gene_1","Gene_2"), value.name = "Npair")
     
-    # Adjust p-values for multiple testing using the False Discovery Rate (FDR) method
-    adjusted_p_matrix <- p.adjust(as.vector(gene_p_matrix), method = "fdr")
+    # Require adequate overlap: ≥ 2/3 of conditions (or set a fixed number)
+    min_overlap <- floor((2/3) * ncol(Scored_Dataset))
     
-    # Reshape the adjusted p-value matrix to match the original dimensions
-    adjusted_p_matrix <- matrix(adjusted_p_matrix, 
-                                nrow = nrow(gene_p_matrix), 
-                                ncol = ncol(gene_p_matrix), 
-                                dimnames = dimnames(gene_p_matrix))
-    
-    # Melt the correlation matrix into a long format (Gene_1, Gene_2, Correlation)
-    melted_gene_cor <- reshape2::melt(gene_cor_matrix, varnames = c("Gene_1", "Gene_2"), value.name = "Correlation (r)")
-    
-    # Melt the adjusted p-value matrix into a long format (Gene_1, Gene_2, qval)
-    melted_p_values <- reshape2::melt(adjusted_p_matrix, varnames = c("Gene_1", "Gene_2"), value.name = "qval")
-    
-    # Combine the correlation and p-value data frames
-    combined_data <- melted_gene_cor %>%
-      left_join(melted_p_values, by = c("Gene_1", "Gene_2")) %>%   # Join by Gene_1 and Gene_2
-      dplyr::filter(abs(`Correlation (r)`) > 0.4 & Gene_1 != Gene_2) %>%  # Apply correlation threshold and exclude self-correlations
-      mutate(
-        `Correlation (r)` = round(`Correlation (r)`, 4),  # Round correlation values to 4 decimal places
-        qval = formatC(as.numeric(qval), format = "e", digits = 4)  # Format p-values in scientific notation with 4 decimal places
-      )
-    
-    # Output the final combined data as a data frame
-    as.data.frame(combined_data)
+    df <- df_r %>%
+      left_join(df_q, by = c("Gene_1","Gene_2")) %>%
+      left_join(df_n, by = c("Gene_1","Gene_2")) %>%
+      dplyr::filter(Gene_1 != Gene_2,
+                    abs(`Correlation (r)`) > 0.4,
+                    Npair >= min_overlap) %>%
+      mutate(`Correlation (r)` = round(`Correlation (r)`, 4),
+             qval = formatC(as.numeric(qval), format = "e", digits = 4))
+    as.data.frame(df)
   })
+  
   
   # Reactive function to dynamically populate the gene dropdown input
   observe({
@@ -1856,46 +3054,39 @@ server <- function(input, output, session) {
   # Condition Correlation Analysis 
   
   # Reactive Function to Generate Correlation Dataset ####
+
   condition_correlation <- reactive({
-    shinyjs::show("loading_gene_corr") 
-    on.exit(shinyjs::hide("loading_gene_corr"))
+    shinyjs::show("loading_gene_corr"); on.exit(shinyjs::hide("loading_gene_corr"))
     Scored_Dataset <- dataset()
-    if (!all(sapply(Scored_Dataset, is.numeric))) {
-      stop("Correlation analysis requires a numeric dataset.")
-    }
-    Scored_Dataset[is.na(Scored_Dataset)] <- median(as.numeric(unlist(Scored_Dataset)), na.rm = TRUE)
-    cond_cor <- as.matrix(Scored_Dataset)
-    rcorr_results <- rcorr(as.matrix(Scored_Dataset), type = "pearson")
-    condition_cor_matrix <- rcorr_results$r
-    condition_p_matrix <- rcorr_results$P
-    adjusted_p_matrix <- p.adjust(as.vector(condition_p_matrix), method = "fdr")
-    adjusted_p_matrix <- matrix(
-      adjusted_p_matrix, 
-      nrow = nrow(condition_p_matrix), 
-      ncol = ncol(condition_p_matrix), 
-      dimnames = dimnames(condition_p_matrix)
-    )
-    melted_cor <- melt(
-      condition_cor_matrix, 
-      varnames = c("Condition_1", "Condition_2"), 
-      value.name = "Correlation (r)"
-    )
-    melted_p_values <- melt(
-      adjusted_p_matrix, 
-      varnames = c("Condition_1", "Condition_2"), 
-      value.name = "qval"
-    )
-    combined_data <- melted_cor %>%
-      left_join(melted_p_values, by = c("Condition_1", "Condition_2")) %>%
-      dplyr::filter(
-        abs(`Correlation (r)`) > 0.4 & Condition_1 != Condition_2  
-      ) %>%
-      mutate(
-        `Correlation (r)` = round(`Correlation (r)`, 4),  
-        qval = formatC(as.numeric(qval), format = "e", digits = 4)  
-      )
-    combined_data
+    if (!all(sapply(Scored_Dataset, is.numeric))) stop("Correlation analysis requires a numeric dataset.")
+    
+    cond_mat <- as.matrix(Scored_Dataset)  # keep NAs
+    
+    rc <- Hmisc::rcorr(cond_mat, type = "pearson")
+    R <- rc$r; P <- rc$P; N <- rc$n
+    
+    Q <- matrix(p.adjust(as.vector(P), method = "fdr"),
+                nrow = nrow(P), ncol = ncol(P), dimnames = dimnames(P))
+    
+    df_r <- reshape2::melt(R, varnames = c("Condition_1","Condition_2"), value.name = "Correlation (r)")
+    df_q <- reshape2::melt(Q, varnames = c("Condition_1","Condition_2"), value.name = "qval")
+    df_n <- reshape2::melt(N, varnames = c("Condition_1","Condition_2"), value.name = "Npair")
+    
+    # Require adequate overlap: ≥ 2/3 of genes (or a fixed minimum)
+    min_overlap <- floor((2/3) * nrow(Scored_Dataset))
+    
+    df <- df_r %>%
+      left_join(df_q, by = c("Condition_1","Condition_2")) %>%
+      left_join(df_n, by = c("Condition_1","Condition_2")) %>%
+      dplyr::filter(Condition_1 != Condition_2,
+                    abs(`Correlation (r)`) > 0.4,
+                    Npair >= min_overlap) %>%
+      mutate(`Correlation (r)` = round(`Correlation (r)`, 4),
+             qval = formatC(as.numeric(qval), format = "e", digits = 4))
+    df
   })
+  
+  
   
   
   # Reactive function to dynamically populate the condition dropdown input
@@ -2116,40 +3307,50 @@ server <- function(input, output, session) {
     on.exit(shinyjs::hide("loading_heatmap"))
     as.matrix(dataset())
   })
+  
   heatmap_data_2 <- reactive({
     req(input$genes2, input$conditions, heatmap_matrix())
-    selected_genes2 <- if ("All" %in% input$genes2) 
-      rownames(heatmap_matrix()) 
-    else 
-      input$genes2  
-    selected_conditions <- if ("All" %in% input$conditions) 
-      colnames(heatmap_matrix()) 
-    else 
-      input$conditions  
-    data <- heatmap_matrix()[selected_genes2, selected_conditions, drop = FALSE]
-    # Inform user if clustering is selected with fewer than 2 genes/conditions
-    if (input$cluster_rows2 && nrow(data) < 2) {
+    M <- heatmap_matrix()
+    
+    # Resolve selections (supports "All") and guard against stale selections
+    sel_genes <- if ("All" %in% input$genes2) rownames(M) else input$genes2
+    sel_conds <- if ("All" %in% input$conditions) colnames(M) else input$conditions
+    sel_genes <- intersect(sel_genes, rownames(M))
+    sel_conds <- intersect(sel_conds, colnames(M))
+    
+    validate(
+      need(length(sel_genes) > 0, "No matching genes in the uploaded matrix."),
+      need(length(sel_conds) > 0, "No matching conditions in the uploaded matrix.")
+    )
+    
+    data <- M[sel_genes, sel_conds, drop = FALSE]
+    
+    # Guard rails for clustering
+    if (isTRUE(input$cluster_rows2) && nrow(data) < 2) {
       showNotification("Please select at least 2 genes for clustering.", type = "error")
       validate(need(FALSE, "Please select at least 2 genes for clustering."))
     }
-    
-    if (input$cluster_columns2 && ncol(data) < 2) {
+    if (isTRUE(input$cluster_columns2) && ncol(data) < 2) {
       showNotification("Please select at least 2 conditions for clustering.", type = "error")
       validate(need(FALSE, "Please select at least 2 conditions for clustering."))
     }
     
-    if (input$cluster_rows2) {
-      row_dist <- dist(data, method = input$distance_metric2)  
-      row_clust <- hclust(row_dist, method = input$clustering_method2)  
-      data <- data[order.dendrogram(as.dendrogram(row_clust)), ] 
+    # --- Local clustering on the selected subset only ---
+    if (isTRUE(input$cluster_rows2)) {
+      row_dist  <- pc_dist(data, method = input$distance_metric2, min_prop = 2/3)
+      row_clust <- hclust(row_dist, method = input$clustering_method2)
+      data <- data[order.dendrogram(as.dendrogram(row_clust)), , drop = FALSE]
     }
-    if (input$cluster_columns2) {
-      col_dist <- dist(t(data), method = input$distance_metric2)  
-      col_clust <- hclust(col_dist, method = input$clustering_method2)  
-      data <- data[, order.dendrogram(as.dendrogram(col_clust))]  
+    if (isTRUE(input$cluster_columns2)) {
+      col_dist  <- pc_dist(t(data), method = input$distance_metric2, min_prop = 2/3)
+      col_clust <- hclust(col_dist, method = input$clustering_method2)
+      data <- data[, order.dendrogram(as.dendrogram(col_clust)), drop = FALSE]
     }
+    
     data
   })
+  
+  
   
   # UI element for gene selection
   output$gene_selector2 <- renderUI({
@@ -2219,24 +3420,25 @@ server <- function(input, output, session) {
   # Render dendrogram heatmap
   output$heatmap_dendrogram2 <- renderPlot({
     req(heatmap_data_2())
-    # Generate the dendrogram heatmap 
     Heatmap(
-      heatmap_data_2(),                            
-      name = "Fitness Score",                      
-      cluster_rows = input$cluster_rows2,          
-      cluster_columns = input$cluster_columns2,  
-      clustering_distance_rows = input$distance_metric2, 
-      clustering_distance_columns = input$distance_metric2,  
-      clustering_method_rows = input$clustering_method2, 
-      clustering_method_columns = input$clustering_method2,  
+      heatmap_data_2(),
+      name = "Fitness Score",
+      cluster_rows    = input$cluster_rows2,
+      cluster_columns = input$cluster_columns2,
+      clustering_distance_rows    = function(x) pc_dist(x,    method = input$distance_metric2, min_prop = 2/3),
+      clustering_distance_columns = function(x) pc_dist(t(x), method = input$distance_metric2, min_prop = 2/3),
+      clustering_method_rows      = input$clustering_method2,
+      clustering_method_columns   = input$clustering_method2,
       heatmap_legend_param = list(
-        title_gp = gpar(fontsize = 14),             
-        labels_gp = gpar(fontsize = 13),            
-        legend_height = unit(4, "cm"),              
-        legend_width = unit(3, "cm")                
+        title_gp = gpar(fontsize = 14),
+        labels_gp = gpar(fontsize = 13),
+        legend_height = unit(4, "cm"),
+        legend_width  = unit(3, "cm")
       )
     )
   })
+  
+  
   
   # Download handler for heatmap data
   output$downloadHeatmapData2 <- downloadHandler(
@@ -2255,21 +3457,19 @@ server <- function(input, output, session) {
   
   # Download handler for dendrogram plot
   output$downloadDendrogramPlot2 <- downloadHandler(
-    filename = function() { 
-      paste("Dendrogram_Plot_", Sys.Date(), ".pdf", sep = "") 
-    },
+    filename = function() paste("Dendrogram_Plot_", Sys.Date(), ".pdf", sep = ""),
     content = function(file) {
-      pdf(file, width = 10, height = 8)  
+      pdf(file, width = 10, height = 8)
       draw(
         Heatmap(
-          heatmap_data_2(),                          
-          name = "Fitness Score",                    
-          cluster_rows = input$cluster_rows2,       
-          cluster_columns = input$cluster_columns2,  
-          clustering_distance_rows = input$distance_metric2,  
-          clustering_distance_columns = input$distance_metric2,  
-          clustering_method_rows = input$clustering_method2,  
-          clustering_method_columns = input$clustering_method2 
+          heatmap_data_2(),
+          name = "Fitness Score",
+          cluster_rows    = input$cluster_rows2,
+          cluster_columns = input$cluster_columns2,
+          clustering_distance_rows    = function(x) pc_dist(x,    method = input$distance_metric2, min_prop = 2/3),
+          clustering_distance_columns = function(x) pc_dist(t(x), method = input$distance_metric2, min_prop = 2/3),
+          clustering_method_rows      = input$clustering_method2,
+          clustering_method_columns   = input$clustering_method2
         )
       )
       dev.off()
@@ -2316,7 +3516,733 @@ server <- function(input, output, session) {
         height = 8,        
         dpi = 300           
       )
+      
+
+    }
+  )
+
+  ### OMICS INTEGRATION 
+  
+  # Helpers
+  `%||%` <- function(x, y) if (is.null(x) || (is.character(x) && !nzchar(x))) y else x
+  
+  read_matrix_csv <- function(path) {
+    path <- normalizePath(as.character(path), mustWork = TRUE)
+    df <- tryCatch(
+      readr::read_csv(file = path, show_col_types = FALSE),
+      error = function(e) utils::read.csv(path, check.names = FALSE, stringsAsFactors = FALSE)
+    )
+    if (is.null(df) || ncol(df) < 2)
+      stop("CSV must have a first column for Gene IDs and ≥1 numeric value column.")
+    rn <- as.character(df[[1]])
+    df <- df[-1]
+    
+    # coerce numerics safely
+    df <- as.data.frame(lapply(df, function(x) {
+      if (is.numeric(x)) x else suppressWarnings(as.numeric(as.character(x)))
+    }), check.names = FALSE)
+    
+    if (!all(vapply(df, is.numeric, TRUE)))
+      stop("All value columns must be numeric (after coercion). Please check your file.")
+    
+    # collapse duplicated gene IDs by row-mean
+    if (anyDuplicated(rn)) {
+      df$.__gene__ <- rn
+      df <- df %>%
+        dplyr::group_by(.__gene__) %>%
+        dplyr::summarise(dplyr::across(where(is.numeric), ~ suppressWarnings(mean(.x, na.rm = TRUE))),
+                         .groups = "drop")
+      rn <- df$.__gene__; df$.__gene__ <- NULL
+    }
+    
+    mat <- as.matrix(df)
+    rownames(mat) <- rn
+    mat
+  }
+  
+  spearman_stats <- function(x, y, conf.level = 0.95) {
+    ok <- is.finite(x) & is.finite(y); x <- x[ok]; y <- y[ok]; n <- length(x)
+    if (n < 4) return(list(rho = NA, lo = NA, hi = NA, p = NA, n = n))
+    ct <- suppressWarnings(suppressMessages(cor.test(x, y, method = "spearman", exact = FALSE)))
+    rho <- unname(ct$estimate); p <- ct$p.value
+    z  <- atanh(rho); se <- 1 / sqrt(max(1, n - 3))
+    zcrit <- qnorm((1 + conf.level)/2)
+    lo <- tanh(z - zcrit * se); hi <- tanh(z + zcrit * se)
+    list(rho = rho, lo = lo, hi = hi, p = p, n = n)
+  }
+  
+  fisher_overlap_stats <- function(chem, omics, thr_chem, thr_omics) {
+    ok <- is.finite(chem) & is.finite(omics); chem <- chem[ok]; omics <- omics[ok]
+    chem_sig  <- abs(chem)  >= thr_chem
+    omics_sig <- abs(omics) >= thr_omics
+    tab <- table(
+      `Chemical Genomics` = factor(chem_sig,  levels = c(FALSE, TRUE), labels = c("No","Yes")),
+      `Omics`             = factor(omics_sig, levels = c(FALSE, TRUE), labels = c("No","Yes"))
+    )
+    ft <- fisher.test(tab)
+    OR <- unname(ft$estimate); lo <- if (!is.null(ft$conf.int)) ft$conf.int[1] else NA
+    hi <- if (!is.null(ft$conf.int)) ft$conf.int[2] else NA
+    list(OR = OR, lo = lo, hi = hi, p = ft$p.value, tab = tab)
+  }
+  
+  fmt_num <- function(x, digs = 3) ifelse(is.na(x), "NA", formatC(x, digits = digs, format = "fg"))
+  
+  diverging_11 <- c("#313695","#4575b4","#74add1","#abd9e9","#e0f3f8",
+                    "#ffffbf","#fee090","#fdae61","#f46d43","#d73027","#a50026")
+  
+  # shared palette for quadrants (used by plotly + ggplot)
+  pal <- c(
+    "Q1: ↑Chemical Genomics & ↑Omics" = "#1b9e77",
+    "Q2: ↓Chemical Genomics & ↑Omics" = "#7570b3",
+    "Q3: ↓Chemical Genomics & ↓Omics" = "#d95f02",
+    "Q4: ↑Chemical Genomics & ↓Omics" = "#e7298a",
+    "Not significant"                 = "#bdbdbd"
+  )
+  
+  
+  # File inputs
+  chem_mat <- reactive({
+    req(input$chem_file)
+    read_matrix_csv(input$chem_file$datapath)
+  })
+  omics_mat <- reactive({
+    req(input$omics_file)
+    read_matrix_csv(input$omics_file$datapath)
+  })
+  
+  # Previews
+  output$chem_preview <- DT::renderDT({
+    req(chem_mat())
+    DT::datatable(
+      as.data.frame(chem_mat(), check.names = FALSE) |> tibble::rownames_to_column("Gene"),
+      options = list(pageLength = 5, scrollX = TRUE),
+      rownames = FALSE
+    )
+  })
+  output$omics_preview <- DT::renderDT({
+    req(omics_mat())
+    DT::datatable(
+      as.data.frame(omics_mat(), check.names = FALSE) |> tibble::rownames_to_column("Gene"),
+      options = list(pageLength = 5, scrollX = TRUE),
+      rownames = FALSE
+    )
+  })
+  
+  # ---------- alignment ----------
+  safe_intersect_rows <- function(A, B) {
+    g <- intersect(rownames(A), rownames(B))  # order follows A
+    list(A = A[g, , drop = FALSE], B = B[g, , drop = FALSE], genes = g)
+  }
+  aligned <- reactive({
+    req(chem_mat(), omics_mat())
+    safe_intersect_rows(chem_mat(), omics_mat())
+  })
+  
+  output$align_stats <- renderText({
+    req(chem_mat(), omics_mat())
+    g_all   <- length(union(rownames(chem_mat()), rownames(omics_mat())))
+    g_inter <- length(aligned()$genes)
+    paste0(
+      "Chemical Genomics genes: ", nrow(chem_mat()), "\n",
+      "Omics genes:             ", nrow(omics_mat()), "\n",
+      "Overlap (common genes):  ", g_inter, " (covers ",
+      round(100 * g_inter / g_all, 1), "% of all unique genes across both lists)\n"
+    )
+  })
+  
+  # ---------- dynamic left controls ----------
+  output$left_controls <- renderUI({
+    req(input$inner, aligned())
+    
+    if (input$inner == "Scatter plot") {
+      tagList(
+        h4("Scatter options"),
+        selectInput("chem_col_scatter", "Chemical Genomics column:",
+                    choices = colnames(aligned()$A),
+                    selected = colnames(aligned()$A)[1]),
+        selectInput("omics_col_scatter", "Omics column:",
+                    choices = colnames(aligned()$B),
+                    selected = colnames(aligned()$B)[1]),
+        
+        sliderInput("thr_chem",  "Chemical Genomics |score| threshold", min = 0, max = 5, value = 1, step = 0.05),
+        helpText("Treats |Chemical Genomics score| ≥ threshold as a ‘hit’."),
+        
+        sliderInput("thr_omics", "Omics |value| threshold",            min = 0, max = 5, value = 1, step = 0.05),
+        helpText("Treats |Omics effect| ≥ threshold as a ‘hit’ (e.g., large |log2FC|)."),
+        
+        numericInput("label_top_n", "Label top N (highlighted genes)", value = 15, min = 0, max = 200),
+        helpText("Labels the top N genes showing the strongest combined changes across both datasets (farther from the origin = larger joint effect)."),
+        
+        actionButton("scatter_refresh", "Generate Plot"),
+        br(), br(),
+        downloadButton("dl_scatter_pub", "Download Scatter (PDF)"),
+        downloadButton("dl_hits", "Download Hits (CSV)")
+      )
+      
+    } else if (input$inner == "Heatmaps") {
+      genes <- aligned()$genes
+      colsA <- colnames(aligned()$A)
+      colsB <- colnames(aligned()$B)
+      tagList(
+        h4("Heatmap options"),
+        selectizeInput("heat_genes", "Genes (optional subset)", choices = genes,
+                       multiple = TRUE, options = list(placeholder = "Leave empty = all genes"), selected = NULL),
+        selectizeInput("heat_cols_chem", "Chemical Genomics columns", choices = colsA, multiple = TRUE,
+                       selected = colsA[1:min(4, length(colsA))]),
+        selectizeInput("heat_cols_omics", "Omics columns", choices = colsB, multiple = TRUE,
+                       selected = colsB[1:min(4, length(colsB))]),
+        tags$hr(),
+        br(),
+        downloadButton("dl_heatmap_data", "Download Heatmap Data (CSV)"),
+        downloadButton("dl_heatmap_pdf",  "Download Heatmaps (PDF)")    # <-- add
+        
+      )
+      
+    } else if (input$inner == "Overlap Summary") {
+      tagList(
+        h4("Overlap options"),
+        sliderInput("thr_chem",  "Chemical Genomics |score| threshold", min = 0, max = 5, value = 1, step = 0.05),
+        sliderInput("thr_omics", "Omics |value| threshold",            min = 0, max = 5, value = 1, step = 0.05),
+        helpText("Counts use ±thresholds on each axis; Fisher’s exact test evaluates enrichment of double-hits."),
+        downloadButton("dl_overlap", "Download Overlap (CSV)")
+      )
+    }
+  })
+  
+  # ---------- scatter data & plot ----------
+  scatter_df <- eventReactive(input$scatter_refresh, {
+    req(aligned(), input$chem_col_scatter, input$omics_col_scatter)
+    thrc <- if (is.null(input$thr_chem)) 1 else input$thr_chem
+    thro <- if (is.null(input$thr_omics)) 1 else input$thr_omics
+    
+    A <- aligned()$A[, input$chem_col_scatter, drop = FALSE]
+    B <- aligned()$B[, input$omics_col_scatter, drop = FALSE]
+    
+    tibble::tibble(
+      Gene  = rownames(A),
+      Chem  = as.numeric(A[,1]),
+      Omics = as.numeric(B[,1]),
+      absR  = sqrt(Chem^2 + Omics^2),
+      Q     = dplyr::case_when(
+        Chem >=  thrc & Omics >=  thro ~ "Q1: ↑Chemical Genomics & ↑Omics",
+        Chem <= -thrc & Omics >=  thro ~ "Q2: ↓Chemical Genomics & ↑Omics",
+        Chem <= -thrc & Omics <= -thro ~ "Q3: ↓Chemical Genomics & ↓Omics",
+        Chem >=  thrc & Omics <= -thro ~ "Q4: ↑Chemical Genomics & ↓Omics",
+        TRUE                           ~ "Not significant"
+      )
+    ) |>
+      dplyr::mutate(
+        Q = factor(Q, levels = c(
+          "Q1: ↑Chemical Genomics & ↑Omics",
+          "Q2: ↓Chemical Genomics & ↑Omics",
+          "Q3: ↓Chemical Genomics & ↓Omics",
+          "Q4: ↑Chemical Genomics & ↓Omics",
+          "Not significant"
+        )),
+        Hover = paste0(
+          "Gene: ", Gene,
+          "<br>Omics: ", signif(Omics, 4),
+          "<br>Chemical Genomics: ", signif(Chem, 4),
+          "<br>Group: ", as.character(Q)
+        )
+      )
+  }, ignoreInit = TRUE)
+  
+  
+  # allow initial draw without clicking Update
+  observeEvent(aligned(), {
+    if (is.null(input$scatter_refresh) || input$scatter_refresh == 0) {
+      isolate({ scatter_df() })
+    }
+  }, ignoreInit = TRUE)
+  
+  spearman_text <- reactive({
+    req(scatter_df())
+    df <- scatter_df()
+    sp <- spearman_stats(df$Omics, df$Chem, conf.level = 0.95)
+    paste0("Spearman \u03C1 = ", fmt_num(sp$rho),
+           " [", fmt_num(sp$lo), ", ", fmt_num(sp$hi), "]",
+           " | p = ", fmt_num(sp$p, 3),
+           " | n = ", sp$n)
+  })
+  
+  fisher_text <- reactive({
+    req(scatter_df())
+    df <- scatter_df()
+    thrc <- if (is.null(input$thr_chem)) 1 else input$thr_chem
+    thro <- if (is.null(input$thr_omics)) 1 else input$thr_omics
+    fo <- fisher_overlap_stats(df$Chem, df$Omics, thrc, thro)
+    paste0("Fisher OR = ", fmt_num(fo$OR),
+           " [", fmt_num(fo$lo), ", ", fmt_num(fo$hi), "]",
+           " | p = ", fmt_num(fo$p, 3))
+  })
+  
+  output$scatter_plot <- renderPlotly({
+    req(scatter_df())
+    df <- scatter_df()
+    
+    nlab <- max(0, as.integer(if (is.null(input$label_top_n)) 0 else input$label_top_n))
+    lab_df <- df |> dplyr::arrange(dplyr::desc(absR)) |> head(nlab)
+    
+    thrc <- if (is.null(input$thr_chem)) 1 else input$thr_chem
+    thro <- if (is.null(input$thr_omics)) 1 else input$thr_omics
+    
+
+    # ONE marker layer (no duplicate add_markers before)
+    p <- plot_ly(
+      data = df,
+      x = ~Omics, y = ~Chem,
+      color = ~Q, colors = pal,
+      text = ~Hover, hoverinfo = "text"
+    ) |>
+      add_markers(marker = list(size = 7, line = list(width = 0)), showlegend = TRUE)
+    
+    # Top-N labels (don’t create a legend entry)
+    if (nrow(lab_df) > 0) {
+      p <- add_text(
+        p,
+        data = lab_df,
+        x = ~Omics, y = ~Chem, text = ~Gene,
+        textposition = "top center",
+        textfont = list(size = 12),
+        showlegend = FALSE,
+        inherit = FALSE
+      )
+    }
+    
+    # Threshold lines
+    shapes <- list(
+      list(type="line", x0=-Inf, x1= Inf, y0= thrc,  y1= thrc,  line=list(dash="dash", width=1)),
+      list(type="line", x0=-Inf, x1= Inf, y0=-thrc,  y1=-thrc,  line=list(dash="dash", width=1)),
+      list(type="line", x0= thro, x1= thro, y0=-Inf, y1= Inf,   line=list(dash="dash", width=1)),
+      list(type="line", x0=-thro, x1=-thro, y0=-Inf, y1= Inf,   line=list(dash="dash", width=1))
+    )
+    
+    p <- layout(
+      p,
+      xaxis = list(title = "Omics value", zeroline = FALSE),
+      yaxis = list(title = "Chemical Genomics score", zeroline = FALSE),
+      shapes = shapes,
+      margin = list(l = 60, r = 20, t = 60, b = 60),
+      annotations = list(list(
+        x = 1, y = 1.12, xref = "paper", yref = "paper",
+        xanchor = "right", yanchor = "top",
+        text = paste0(spearman_text(), "<br>", fisher_text()),
+        showarrow = FALSE, align = "right",
+        font = list(size = 12)
+      ))
+    )
+    
+    p
+  })
+  
+  
+  # Scatter downloads 
+  output$dl_scatter_pub <- downloadHandler(
+    filename = function() sprintf("scatter_%s_vs_%s.pdf",
+                                  input$chem_col_scatter %||% "chemical_genomics",
+                                  input$omics_col_scatter %||% "omics"),
+    content = function(file) {
+      req(scatter_df())
+      df <- scatter_df()
+      nlab <- ifelse(is.na(input$label_top_n), 0, input$label_top_n)
+      lab_genes <- df |> dplyr::arrange(dplyr::desc(absR)) |> dplyr::slice(1:nlab) |> dplyr::pull(Gene)
+      
+      thrc <- if (is.null(input$thr_chem)) 1 else input$thr_chem
+      thro <- if (is.null(input$thr_omics)) 1 else input$thr_omics
+      
+      p <- ggplot2::ggplot(df, ggplot2::aes(x = Omics, y = Chem)) +
+        ggplot2::geom_hline(yintercept = c(-thrc, thrc), linetype = "dashed", linewidth = 0.4) +
+        ggplot2::geom_vline(xintercept = c(-thro, thro), linetype = "dashed", linewidth = 0.4) +
+        ggplot2::geom_point(ggplot2::aes(color = Q), alpha = 0.8, size = 2.0, stroke = 0) +
+        ggrepel::geom_text_repel(
+          data = df[df$Gene %in% lab_genes, ],
+          ggplot2::aes(label = Gene),
+          size = 2.6, max.overlaps = 100, box.padding = 0.3, segment.size = 0.2, min.segment.length = 0
+        ) +
+        ggplot2::labs(x = "Omics value", y = "Chemical Genomics score", color = "Quadrant") +
+        ggplot2::scale_color_manual(values = pal[levels(df$Q)], limits = levels(df$Q), drop = FALSE) +  
+        ggplot2::theme_classic(base_size = 9) +
+        ggplot2::theme(legend.position = "right", plot.margin = ggplot2::margin(4, 6, 4, 6)) +
+        ggplot2::annotate("text", x = Inf, y = Inf, hjust = 1.02, vjust = 1.2, size = 2.5,
+                          label = paste0(spearman_text(), "\n", fisher_text()))
+      ggplot2::ggsave(file, plot = p, width = 7, height = 5, units = "in", dpi = 300)
     }
   )
   
+  output$dl_hits <- downloadHandler(
+    filename = function() sprintf("quadrant_hits_%s_vs_%s.csv",
+                                  input$chem_col_scatter %||% "chemical_genomics",
+                                  input$omics_col_scatter %||% "omics"),
+    content = function(file) {
+      req(scatter_df())
+      write.csv(scatter_df() |> dplyr::filter(Q != "Not significant"), file, row.names = FALSE)
+    }
+  )
+  
+  # Heatmaps 
+  
+  heat_input <- reactive({
+    req(aligned())
+    A <- aligned()$A
+    B <- aligned()$B
+    
+    # genes subset
+    g_all <- rownames(A)
+    g_sel <- if (is.null(input$heat_genes) || length(input$heat_genes) == 0) g_all else intersect(input$heat_genes, g_all)
+    req(length(g_sel) > 0)
+    
+    # columns subset (if you kept selectors, otherwise first few)
+    colsA <- if (!is.null(input$heat_cols_chem) && length(input$heat_cols_chem)) input$heat_cols_chem else colnames(A)[seq_len(min(4, ncol(A)))]
+    colsB <- if (!is.null(input$heat_cols_omics) && length(input$heat_cols_omics)) input$heat_cols_omics else colnames(B)[seq_len(min(4, ncol(B)))]
+    
+    A <- A[g_sel, colsA, drop = FALSE]
+    B <- B[g_sel, colsB, drop = FALSE]
+    
+    # DEFAULT: order genes by mean Chemical Genomics (descending)
+    ord <- order(rowMeans(A, na.rm = TRUE), decreasing = TRUE)
+    A <- A[ord, , drop = FALSE]
+    B <- B[rownames(A), , drop = FALSE]
+    
+    # symmetric ranges centered at 0 for EACH
+    limA <- max(abs(A), na.rm = TRUE); if (!is.finite(limA)) limA <- 1
+    limB <- max(abs(B), na.rm = TRUE); if (!is.finite(limB)) limB <- 1
+    
+    list(A = A, B = B, limA = limA, limB = limB)
+  })
+  
+  output$heatmaps <- renderPlotly({
+    hi <- heat_input()
+    A <- hi$A; B <- hi$B
+    
+    At <- t(A)  # rows = conditions, cols = genes
+    Bt <- t(B)
+    
+    # shared symmetric limits
+    lim <- max(hi$limA, hi$limB); if (!is.finite(lim)) lim <- 1
+    
+    mk_hover_t <- function(Mt, rowlabs, collabs) {
+      outer(seq_along(rowlabs), seq_along(collabs), Vectorize(function(i, j) {
+        paste0(
+          "Gene: ", collabs[j],
+          "<br>Condition: ", rowlabs[i],
+          "<br>Value: ", signif(Mt[i, j], 4)
+        )
+      }))
+    }
+    hA <- mk_hover_t(At, rownames(At), colnames(At))
+    hB <- mk_hover_t(Bt, rownames(Bt), colnames(Bt))
+    
+    # Left: Chemical Genomics (no colorbar shown)
+    p1 <- plotly::plot_ly(
+      x = colnames(At), y = rownames(At), z = At,
+      type = "heatmap",
+      colors = diverging_11,
+      showscale = FALSE,            # hide on left
+      zmid = 0, zmin = -lim, zmax = lim,
+      text = hA, hoverinfo = "text"
+    ) %>%
+      layout(
+        xaxis = list(title = "Gene", tickangle = 90, automargin = TRUE, titlefont = list(size = 13)),
+        yaxis = list(title = "Condition", automargin = TRUE, titlefont = list(size = 13), tickfont = list(size = 11)),
+        margin = list(l = 90, r = 30, t = 30, b = 90)
+      )
+    
+    # Right: Omics (single shared colorbar on the right)
+    p2 <- plotly::plot_ly(
+      x = colnames(Bt), y = rownames(Bt), z = Bt,
+      type = "heatmap",
+      colors = diverging_11,
+      showscale = TRUE,             # show only on right
+      zmid = 0, zmin = -lim, zmax = lim,
+      colorbar = list(x = 1.05),    # place colorbar slightly to the right
+      text = hB, hoverinfo = "text"
+    ) %>%
+      layout(
+        xaxis = list(title = "Gene", tickangle = 90, automargin = TRUE, titlefont = list(size = 13)),
+        yaxis = list(title = "Condition", automargin = TRUE, titlefont = list(size = 13), tickfont = list(size = 11)),
+        margin = list(l = 90, r = 30, t = 30, b = 90)
+      )
+    
+    plotly::subplot(p1, p2, nrows = 1, shareX = FALSE, shareY = FALSE, widths = c(0.46, 0.46), margin = 0.06) %>%
+      layout(
+        annotations = list(
+          list(
+            x = 0.23, y = 1.08,
+            text = "<b>Chemical Genomics</b>",
+            showarrow = FALSE, xref = "paper", yref = "paper",
+            xanchor = "center", yanchor = "bottom",
+            font = list(size = 15)
+          ),
+          list(
+            x = 0.77, y = 1.08,
+            text = "<b>Omics</b>",
+            showarrow = FALSE, xref = "paper", yref = "paper",
+            xanchor = "center", yanchor = "bottom",
+            font = list(size = 15)
+          )
+        ),
+        margin = list(l = 100, r = 120, t = 100, b = 100) # a little extra right space for the colorbar
+      )
+  })
+  
+  
+  
+  
+  output$dl_heatmap_plot <- downloadHandler(
+    filename = function() paste0("heatmaps_", Sys.Date(), ".png"),
+    content = function(file) {
+      hi <- heat_input()
+      A <- hi$A; B <- hi$B
+      At <- t(A); Bt <- t(B)
+      
+      # shared symmetric limits
+      lim <- max(hi$limA, hi$limB); if (!is.finite(lim)) lim <- 1
+      
+      mk_hover_t <- function(Mt, rowlabs, collabs) {
+        outer(seq_along(rowlabs), seq_along(collabs), Vectorize(function(i, j) {
+          paste0("Gene: ", collabs[j], "<br>Condition: ", rowlabs[i], "<br>Value: ", signif(Mt[i, j], 4))
+        }))
+      }
+      hA <- mk_hover_t(At, rownames(At), colnames(At))
+      hB <- mk_hover_t(Bt, rownames(Bt), colnames(Bt))
+      
+      p1 <- plotly::plot_ly(
+        x = colnames(At), y = rownames(At), z = At,
+        type = "heatmap", colors = diverging_11,
+        showscale = FALSE,
+        zmid = 0, zmin = -lim, zmax = lim, text = hA, hoverinfo = "text"
+      )
+      p2 <- plotly::plot_ly(
+        x = colnames(Bt), y = rownames(Bt), z = Bt,
+        type = "heatmap", colors = diverging_11,
+        showscale = TRUE, colorbar = list(x = 1.05),
+        zmid = 0, zmin = -lim, zmax = lim, text = hB, hoverinfo = "text"
+      )
+      
+      plt <- plotly::subplot(p1, p2, nrows = 1, shareX = FALSE, shareY = FALSE, widths = c(0.46, 0.46), margin = 0.06) %>%
+        layout(
+          annotations = list(
+            list(x = 0.23, y = 1.08, text = "<b>Chemical Genomics</b>", showarrow = FALSE, xref = "paper", yref = "paper",
+                 xanchor = "center", yanchor = "bottom", font = list(size = 15)),
+            list(x = 0.77, y = 1.08, text = "<b>Omics</b>", showarrow = FALSE, xref = "paper", yref = "paper",
+                 xanchor = "center", yanchor = "bottom", font = list(size = 15))
+          ),
+          margin = list(l = 100, r = 120, t = 100, b = 100)
+        )
+      
+      ok <- TRUE
+      tryCatch({
+        plotly::save_image(plt, file = file, width = 1600, height = 900, scale = 2)
+      }, error = function(e) { ok <<- FALSE })
+      if (!ok) {
+        stop("PNG export requires the 'kaleido' (preferred) or 'orca' engine. Install with:\n  reticulate::py_install('kaleido')\nOr: install.packages('orcacapture') and set it up.\nAlternatively, I can add an HTML download.")
+      }
+    }
+  )
+  
+  
+  
+  
+  # heatmap data download
+  output$dl_heatmap_data <- downloadHandler(
+    filename = function() "heatmaps_data.csv",
+    content = function(file) {
+      req(aligned(), input$heat_cols_chem, input$heat_cols_omics)
+      A0 <- aligned()$A; B0 <- aligned()$B
+      g_all <- rownames(A0)
+      g_sel <- if (is.null(input$heat_genes) || length(input$heat_genes) == 0) g_all else intersect(input$heat_genes, g_all)
+      A <- A0[g_sel, input$heat_cols_chem, drop = FALSE]
+      B <- B0[g_sel, input$heat_cols_omics, drop = FALSE]
+      
+      # same default ordering by mean Chemical Genomics
+      ord <- order(rowMeans(A, na.rm = TRUE), decreasing = TRUE)
+      A <- A[ord, , drop = FALSE]
+      B <- B[rownames(A), , drop = FALSE]
+      
+      A_long <- as.data.frame(A) |> tibble::rownames_to_column("Gene") |>
+        tidyr::pivot_longer(-Gene, names_to = "Condition", values_to = "Value") |>
+        dplyr::mutate(Layer = "Chemical Genomics")
+      B_long <- as.data.frame(B) |> tibble::rownames_to_column("Gene") |>
+        tidyr::pivot_longer(-Gene, names_to = "Condition", values_to = "Value") |>
+        dplyr::mutate(Layer = "Omics")
+      write.csv(dplyr::bind_rows(A_long, B_long), file, row.names = FALSE)
+    }
+  )
+  
+  
+  output$dl_heatmap_pdf <- downloadHandler(
+    filename = function() paste0("heatmaps_", Sys.Date(), ".pdf"),
+    content = function(file) {
+      hi <- heat_input()
+      A <- hi$A; B <- hi$B
+      lim <- max(hi$limA, hi$limB); if (!is.finite(lim)) lim <- 1
+      
+      dfA <- as.data.frame(A) |> tibble::rownames_to_column("Gene") |>
+        tidyr::pivot_longer(-Gene, names_to = "Condition", values_to = "Value") |>
+        dplyr::mutate(Layer = "Chemical Genomics")
+      dfB <- as.data.frame(B) |> tibble::rownames_to_column("Gene") |>
+        tidyr::pivot_longer(-Gene, names_to = "Condition", values_to = "Value") |>
+        dplyr::mutate(Layer = "Omics")
+      df_all <- dplyr::bind_rows(dfA, dfB)
+      
+      p <- ggplot2::ggplot(df_all, ggplot2::aes(x = Gene, y = Condition, fill = Value)) +
+        ggplot2::geom_tile(color = "white", linewidth = 0.1) +
+        ggplot2::facet_wrap(~Layer, nrow = 1, scales = "free_y") +
+        ggplot2::scale_y_discrete(drop = TRUE) +
+        ggplot2::scale_fill_gradient2(
+          low = "#313695", mid = "#ffffbf", high = "#a50026",
+          midpoint = 0, limits = c(-lim, lim),
+          name = "Score") +
+        ggplot2::labs(
+          x = NULL, y = NULL) +
+        ggplot2::theme_minimal(base_size = 8) +
+        ggplot2::theme(
+          strip.background = ggplot2::element_blank(),            # remove grey boxes
+          strip.text = ggplot2::element_text(size = 9, face = "bold", color = "#2C3E50"),
+          axis.text.x = ggplot2::element_text(angle = 90, vjust = 0.5, hjust = 1, size = 6),
+          axis.text.y = ggplot2::element_text(size = 6),
+          panel.grid = ggplot2::element_blank(),
+          panel.spacing = ggplot2::unit(0.4, "lines"),
+          legend.position = "right",
+          legend.title = ggplot2::element_text(size = 8),
+          legend.text = ggplot2::element_text(size = 7)
+        )
+      
+      ggplot2::ggsave(file, plot = p, width = 9, height = 4, units = "in", device = "pdf")
+    }
+  )
+  
+
+  
+  # ---------- overlap summary ----------
+  overlap_tbl <- reactive({
+    req(aligned(), input$chem_col_scatter, input$omics_col_scatter)
+    thrc <- if (is.null(input$thr_chem)) 1 else input$thr_chem
+    thro <- if (is.null(input$thr_omics)) 1 else input$thr_omics
+    
+    A <- aligned()$A[, input$chem_col_scatter, drop = FALSE][,1]
+    B <- aligned()$B[, input$omics_col_scatter, drop = FALSE][,1]
+    chemical_genomics_sig  <- abs(A) >= thrc
+    omics_sig              <- abs(B) >= thro
+    tibble::tibble(
+      Category = c("Chemical Genomics only", "Omics only", "Intersection", "Neither"),
+      Count = c(sum(chemical_genomics_sig & !omics_sig),
+                sum(!chemical_genomics_sig & omics_sig),
+                sum(chemical_genomics_sig & omics_sig),
+                sum(!chemical_genomics_sig & !omics_sig))
+    )
+  })
+  
+  output$overlap_plot <- renderPlot({
+    req(scatter_df())
+    df <- scatter_df()
+    thrc <- if (is.null(input$thr_chem)) 1 else input$thr_chem
+    thro <- if (is.null(input$thr_omics)) 1 else input$thr_omics
+    fo <- fisher_overlap_stats(df$Chem, df$Omics, thrc, thro)
+    
+    tab <- as.matrix(fo$tab)
+    plot_df <- tibble::tibble(
+      Category = factor(
+        c("Both significant", "Chemical Genomics only", "Omics only", "Neither significant"),
+        levels = c("Both significant", "Chemical Genomics only", "Omics only", "Neither significant")
+      ),
+      Count = c(tab["Yes","Yes"], tab["Yes","No"], tab["No","Yes"], tab["No","No"])
+    )
+    
+    # ChemGenXplore gradient palette (teal → blue → light gray)
+    cgx_colors <- c(
+      "Both significant"          = "#009999",  # Teal
+      "Chemical Genomics only"    = "#1E88E5",  # Blue
+      "Omics only"                = "#42A5F5",  # Lighter blue
+      "Neither significant"       = "#D6DBDF"   # Soft gray
+    )
+    
+    ggplot(plot_df, aes(x = Category, y = Count, fill = Category)) +
+      geom_col(width = 0.65, color = "black", alpha = 0.9) +
+      scale_fill_manual(values = cgx_colors) +
+      scale_y_continuous(expand = expansion(mult = c(0, 0.05))) +
+      labs(
+        title = "Overlap Summary",
+        x = NULL,
+        y = "Number of Genes"
+      ) +
+      theme_classic(base_size = 14) +
+      theme(
+        plot.title  = element_text(size = 18, face = "bold", hjust = 0.5, color = "#2C3E50"),
+        axis.text.x = element_text(size = 13, face = "bold", color = "#2C3E50"),
+        axis.text.y = element_text(size = 13, face = "bold", color = "#2C3E50"),
+        axis.title.y = element_text(size = 15, face = "bold", color = "#2C3E50"),
+        legend.position = "none",
+        plot.margin = margin(10, 15, 6, 10)
+      )
+  }, height = 350)
+  
+  
+  
+  output$overlap_table <- renderUI({
+    req(scatter_df())
+    df <- scatter_df()
+    thrc <- if (is.null(input$thr_chem)) 1 else input$thr_chem
+    thro <- if (is.null(input$thr_omics)) 1 else input$thr_omics
+    fo <- fisher_overlap_stats(df$Chem, df$Omics, thrc, thro)
+    
+    mat <- as.matrix(fo$tab)
+    counts <- data.frame(
+      Metric = c(
+        "Number of genes that pass the threshold in both datasets",
+        "Number of genes that pass the threshold in Chemical Genomics only",
+        "Number of genes that pass the threshold in Omics only",
+        "Number of genes below threshold in both datasets"
+      ),
+      Value = c(
+        mat["Yes", "Yes"],
+        mat["Yes", "No"],
+        mat["No",  "Yes"],
+        mat["No",  "No"]
+      ),
+      row.names = NULL,
+      check.names = FALSE
+    )
+    
+    # Combine table + explanation in one renderUI output
+    tagList(
+      DT::renderDataTable({
+        DT::datatable(
+          counts,
+          rownames = FALSE,
+          options = list(dom = "t", pageLength = 5)
+        )
+      }),
+      tags$div(
+        style = "margin-top:12px; font-size:15px; color:#2C3E50;",
+        HTML(sprintf("
+      <p><b>Fisher’s exact test.</b> 
+      <i>Odds Ratio (OR)</i> = %s, 
+      95%% CI = [%s, %s], 
+      <i>p</i> = %s.</p>
+      <ul style='margin-top:6px;'>
+        <li><b>Odds Ratio (OR):</b> measures enrichment of overlap. OR &gt; 1 → enrichment; OR ≈ 1 → no association; OR &lt; 1 → depletion.</li>
+        <li><b>95%% Confidence Interval (CI):</b> range for the true OR. If the CI excludes 1, the overlap is statistically significant.</li>
+        <li><b>p-value:</b> probability of observing this overlap by chance. Lower values indicate stronger evidence of a true relationship.</li>
+      </ul>
+    ",
+                     fmt_num(fo$OR),
+                     fmt_num(fo$lo),
+                     fmt_num(fo$hi),
+                     fmt_num(fo$p, 3)
+        ))
+      )
+    )
+  })
+  
+  
+  output$dl_overlap <- downloadHandler(
+    filename = function() "overlap_summary.csv",
+    content = function(file) write.csv(overlap_tbl(), file, row.names = FALSE)
+  )
+
 }
+
+  
+  

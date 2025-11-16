@@ -43,9 +43,14 @@ Chemical genomic screens are a valuable resource for uncovering gene functions a
     </p>
     
   - Use the same phenotypic, correlation, enrichment, and heatmap analysis tools available for the E. coli dataset.
-
-- **Test File**
   - The test file `Scored_Published_Dataset.csv` is located in the `Example_Dataset` folder.
+
+- **Omics Integration**:
+  - Integrate chemical-genomic and omics datasets (e.g., transcriptomics/proteomics) aligned by Gene IDs.
+  - Generate scatter plots with quadrant classification based on selected score thresholds.
+  - View paired heatmaps.
+  - Summarise overlap categories and Fisher’s exact test statistics.
+  - Test files chemgen.csv and omics.csv are available in the Test_Files folder.
 
 
 **All plots and data tables generated can be downloaded.**
@@ -138,6 +143,7 @@ ChemGenXplore includes three pre-integrated, publicly available *Escherichia col
 - Nichols et al., 2011: https://doi.org/10.1016/j.cell.2010.11.052
 - Shiver et al., 2016: https://doi.org/10.1371/journal.pgen.1006124
 - Price et al., 2018: https://doi.org/10.1038/s41586-018-0124-0
+- Viéitez et al., 2022: https://doi.org/10.1038/s41587-021-01051-x
 
 **Users also have the flexibility to upload their own datasets for analysis.**
 

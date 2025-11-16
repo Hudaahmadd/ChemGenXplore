@@ -3,6 +3,26 @@
 # 2. Sidebar
 # 3. Body 
 
+# helper 
+cgx_selectize <- function(inputId, label, choices = NULL, multiple = TRUE) {
+  selectizeInput(
+    inputId, label,
+    choices = choices, multiple = multiple,
+    options = list(
+      onPaste = I("window.CGX_onPaste"),
+      plugins = NULL,
+      create  = TRUE,
+      persist = FALSE,
+      render = I("{
+        item: function(item, escape) {
+          var lbl = item.label || item.text || item.value || '';
+          return '<div class=\"item-no-x\">' + escape(lbl) + '</div>';
+        }
+      }")
+    )
+  )
+}
+
 ui <- dashboardPage(
   title = "ChemGenXplore",  # browser tab title
   # Dashboard Header: Displays the application title
@@ -19,20 +39,54 @@ ui <- dashboardPage(
       menuItem("About", tabName = "about", icon = icon("info-circle")),
       menuItem("User Guide", tabName = "user_guide", icon = icon("book")),
       menuItem("E. coli", tabName = "ecoli", icon = icon("bacteria")),
-      menuItem("Upload Your Dataset", tabName = "upload_your_dataset", icon = icon("upload"))
+      menuItem("S. cerevisiae", tabName = "yeast", icon = icon("bread-slice")),
+      menuItem("Upload Your Dataset", tabName = "upload_your_dataset", icon = icon("upload")),
+      menuItem("Omics Integration", tabName = "omics", icon = icon("layer-group"))
+      
     )
   ),
   
   # Dashboard Body: Includes custom styling and dynamic content placeholders
-  dashboardBody(
-    tags$head(
-      tags$link(rel = "stylesheet", type = "text/css", href = "custom.css"), # Your custom CSS
-      tags$link(
-        href = "https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&display=swap",
-        rel = "stylesheet"
-      ), # Google Fonts link
-      tags$meta(name = "viewport", content = "width=device-width, initial-scale=1") # Responsive meta tag
-    ),
+    dashboardBody(
+      tags$head(
+        tags$link(rel = "stylesheet", type = "text/css", href = "custom.css"), # Your custom CSS
+        tags$link(
+          href = "https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&display=swap",
+          rel = "stylesheet"
+        ), # Google Fonts link
+        tags$meta(name = "viewport", content = "width=device-width, initial-scale=1"), # Responsive meta tag
+        
+        # ⬇️ ADD THIS JAVASCRIPT SNIPPET BELOW
+        tags$script(HTML(
+          "window.CGX_onPaste = function(text){
+   var s = this; // selectize instance
+   var items = text.split(/\\r?\\n|,|;|\\t|\\s+/)
+                   .map(function(x){return x.trim();})
+                   .filter(Boolean);
+
+   var toAdd = [];
+   var optionKeys = Object.keys(s.options || {});
+   items.forEach(function(v){
+     if (s.options[v] !== undefined) { toAdd.push(v); return; }
+     // case-insensitive fallback
+     var found = optionKeys.find(function(k){ return k.toLowerCase() === v.toLowerCase(); });
+     if (found !== undefined) { toAdd.push(found); return; }
+     // allow new values if create=TRUE
+     if (s.settings.create) {
+       s.addOption({value:v, text:v});
+       toAdd.push(v);
+     }
+   });
+
+   var current = s.getValue();
+   if (!Array.isArray(current)) current = current ? [current] : [];
+   var merged = Array.from(new Set(current.concat(toAdd)));
+   s.setValue(merged, true);
+   return false;
+};")
+        )
+      ),
+      
     
     
     tabItems(
@@ -79,73 +133,109 @@ ui <- dashboardPage(
             )
           )
         ),
-        fluidRow(
-          # Phenotype Visualization
-          column(
-            width = 6,
-            div(
-              style = "background-color: #D6EAF8; color: black; border: 2px solid #00509E; border-radius: 10px; padding: 15px; margin-bottom: 15px; box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);",
-              h3(
-                icon("chart-bar", style = "font-size: 20px; margin-right: 10px; color: #00509E;"),
-                "Phenotype Visualisation",
-                style = "margin: 0; font-weight: bold; font-size: 18px;"
-              ),
-              tags$p(
-                "Visualise gene and condition phenotypes with interactive plots and tables, filtered by FDR thresholds.",
-                style = "font-size: 14px; color: black; margin-top: 10px;"
+
+          fluidRow(
+            # Phenotype Visualization
+            column(
+              width = 6,
+              div(
+                style = "background-color: #D6EAF8; color: black; border: 2px solid #00509E; border-radius: 10px; padding: 15px; margin-bottom: 15px; box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);",
+                h3(
+                  icon("chart-bar", style = "font-size: 20px; margin-right: 10px; color: #00509E;"),
+                  "Phenotype Visualisation",
+                  style = "margin: 0; font-weight: bold; font-size: 18px;"
+                ),
+                tags$p(
+                  "Visualise gene and condition phenotypes with interactive plots and tables, filtered by FDR thresholds.",
+                  style = "font-size: 14px; color: black; margin-top: 10px;"
+                )
+              )
+            ),
+            # Correlation Visualization
+            column(
+              width = 6,
+              div(
+                style = "background-color: #85C1E9; color: black; border: 2px solid #00509E; border-radius: 10px; padding: 15px; margin-bottom: 15px; box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);",
+                h3(
+                  icon("project-diagram", style = "font-size: 20px; margin-right: 10px; color: #00509E;"),
+                  "Correlation Visualisation",
+                  style = "margin: 0; font-weight: bold; font-size: 18px;"
+                ),
+                tags$p(
+                  "Visualise gene and condition correlations with interactive plots and tables, filtered by FDR thresholds.",
+                  style = "font-size: 14px; color: black; margin-top: 10px;"
+                )
               )
             )
           ),
-          # Correlation Visualization
-          column(
-            width = 6,
-            div(
-              style = "background-color: #85C1E9; color: black; border: 2px solid #00509E; border-radius: 10px; padding: 15px; margin-bottom: 15px; box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);",
-              h3(
-                icon("project-diagram", style = "font-size: 20px; margin-right: 10px; color: #00509E;"),
-                "Correlation Visualisation",
-                style = "margin: 0; font-weight: bold; font-size: 18px;"
-              ),
-              tags$p(
-                "Visualise gene and condition correlations with interactive plots and tables, filtered by FDR thresholds.",
-                style = "font-size: 14px; color: black; margin-top: 10px;"
+          fluidRow(
+            # Enrichment Analysis
+            column(
+              width = 6,
+              div(
+                style = "background-color: #D5F5E3; color: black; border: 2px solid #117A65; border-radius: 10px; padding: 15px; margin-bottom: 15px; box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);",
+                h3(
+                  icon("flask", style = "font-size: 20px; margin-right: 10px; color: #117A65;"),
+                  "Enrichment Analysis",
+                  style = "margin: 0; font-weight: bold; font-size: 18px;"
+                ),
+                tags$p(
+                  "Perform GO and KEGG enrichment analysis to identify functional pathways and gene sets, with interactive plots and downloadable results.",
+                  style = "font-size: 14px; color: black; margin-top: 10px;"
+                )
+              )
+            ),
+            column(
+              # Interactive Heatmaps
+              width = 6,
+              div(
+                style = "background-color: #82E0AA; color: black; border: 2px solid #117A65; border-radius: 10px; padding: 15px; margin-bottom: 15px; box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);",
+                h3(
+                  icon("th", style = "font-size: 20px; margin-right: 10px; color: #117A65;"),
+                  "Interactive Heatmaps",
+                  style = "margin: 0; font-weight: bold; font-size: 18px;"
+                ),
+                tags$p(
+                  "Visualise gene-condition fitness data with interactive heatmaps and dendrograms, offering clustering options and downloadable visualisations.",
+                  style = "font-size: 14px; color: black; margin-top: 10px;"
+                )
               )
             )
-          )
-        ),
-        fluidRow(
-          # Enrichment Analysis
-          column(
-            width = 6,
-            div(
-              style = "background-color: #D5F5E3; color: black; border: 2px solid #117A65; border-radius: 10px; padding: 15px; margin-bottom: 15px; box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);",
-              h3(
-                icon("flask", style = "font-size: 20px; margin-right: 10px; color: #117A65;"),
-                "Enrichment Analysis",
-                style = "margin: 0; font-weight: bold; font-size: 18px;"
-              ),
-              tags$p(
-                "Perform GO and KEGG enrichment analysis to identify functional pathways and gene sets, with interactive plots and downloadable results.",
-                style = "font-size: 14px; color: black; margin-top: 10px;"
+            ,
+            
+            # Upload Your Dataset 
+            column(
+              width = 6,
+              div(
+                style = "background-color: #EAF4FC; color: black; border: 2px solid #00509E; border-radius: 10px; padding: 15px; margin-bottom: 15px; box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);",
+                h3(
+                  icon("upload", style = "font-size: 20px; margin-right: 10px; color: #00509E;"),
+                  "Upload Your Dataset",
+                  style = "margin: 0; font-weight: bold; font-size: 18px;"
+                ),
+                tags$p(
+                  "Upload your scored dataset to run FDR analysis and visualise phenotypes, correlations, and heatmaps.",
+                  style = "font-size: 14px; color: black; margin-top: 10px;"
+                )
+              )
+            ),
+            
+            # Omics Integration 
+            column(
+              width = 6,
+              div(
+                style = "background-color: #B7DBF2; color: black; border: 2px solid #00509E; border-radius: 10px; padding: 15px; margin-bottom: 15px; box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);",
+                h3(
+                  icon("layer-group", style = "font-size: 20px; margin-right: 10px; color: #00509E;"),
+                  "Omics Integration",
+                  style = "margin: 0; font-weight: bold; font-size: 18px;"
+                ),
+                tags$p(
+                  "Integrate chemical genomic data with omics to compare hits, quantify overlap, and visualise shared patterns.",
+                  style = "font-size: 14px; color: black; margin-top: 10px;"
+                )
               )
             )
-          ),
-          column(
-            # Interactive Heatmaps
-            width = 6,
-            div(
-              style = "background-color: #82E0AA; color: black; border: 2px solid #117A65; border-radius: 10px; padding: 15px; margin-bottom: 15px; box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);",
-              h3(
-                icon("th", style = "font-size: 20px; margin-right: 10px; color: #117A65;"),
-                "Interactive Heatmaps",
-                style = "margin: 0; font-weight: bold; font-size: 18px;"
-              ),
-              tags$p(
-                "Visualise gene-condition fitness data with interactive heatmaps and dendrograms, offering clustering options and downloadable visualisations.",
-                style = "font-size: 14px; color: black; margin-top: 10px;"
-              )
-            )
-          )
         )
       ),
       
@@ -166,9 +256,10 @@ ui <- dashboardPage(
               ),
               p(
                 "Chemical genomic screens are a valuable resource for uncovering gene functions and mapping biological pathways. However, their large-scale nature makes these datasets complex and challenging to interpret. ChemGenXplore addresses this challenge by simplifying access to these resources and providing researchers with an intuitive platform to explore and understand genotype-phenotype relationships across various species.",
-                style = "font-size: 16px; color: #2C3E50; margin-bottom: 20px;"
+                style = "font-size: 16px; color: #2C3E50; margin-bottom: 20px; text-align: justify;"
               ),
               tags$hr(style = "border-color: #1ABC9C; margin: 20px 0;"),
+              
               
               # Data Sources Section
               h3(
@@ -177,10 +268,12 @@ ui <- dashboardPage(
                 style = "color: #34495E; font-weight: bold; margin-bottom: 15px; font-size: 18px;"
               ),
               p(
-                "ChemGenXplore includes three pre-integrated, publicly available ",
+                "ChemGenXplore includes pre-integrated, publicly available chemical genomic datasets from ",
                 tags$i("Escherichia coli"),
-                " datasets from chemical genomic screens. These datasets provide fitness scores across a wide range of conditions and serve as the foundation for the analyses performed in ChemGenXplore:",
-                style = "font-size: 16px; color: #2C3E50; margin-bottom: 15px;"
+                " and ",
+                tags$i("Saccharomyces cerevisiae"),
+                ". These datasets provide fitness scores across a wide range of conditions and serve as the foundation for the analyses performed in ChemGenXplore:",
+                style = "font-size: 16px; color: #2C3E50; margin-bottom: 15px; text-align: justify;"
               ),
               tags$ul(
                 style = "font-size: 14px; color: #2C3E50; padding-left: 20px;",
@@ -194,7 +287,7 @@ ui <- dashboardPage(
                   )
                 ),
                 tags$li(
-                  "Shiver et al., 2016: ",
+                  "Shiver et al., 2017: ",
                   tags$a(
                     href = "https://doi.org/10.1371/journal.pgen.1006124",
                     "https://doi.org/10.1371/journal.pgen.1006124", 
@@ -210,74 +303,81 @@ ui <- dashboardPage(
                     target = "_blank", 
                     style = "color: #0047AB; font-weight: normal; text-decoration: none;"
                   )
+                ),
+                tags$li(
+                  "Viéitez et al., 2022: ",
+                  tags$a(
+                    href = "https://doi.org/10.1038/s41587-021-01051-x",
+                    "https://doi.org/10.1038/s41587-021-01051-x", 
+                    target = "_blank", 
+                    style = "color: #0047AB; font-weight: normal; text-decoration: none;"
+                  )
                 )
               ),
               p(
                 "Users also have the flexibility to upload their own datasets for analysis.",
-                style = "font-size: 16px; color: #2C3E50; margin-bottom: 20px;"
+                style = "font-size: 16px; color: #2C3E50; margin-bottom: 20px; text-align: justify;"
               ),
               tags$hr(style = "border-color: #1ABC9C; margin: 20px 0;"),
               
-              # Acknowledgment Section
+              # Acknowledgements Section
               h3(
                 tags$span(style = "color: #1ABC9C; margin-right: 10px;", tags$i(class = "fas fa-hands-helping")), 
-                "Acknowledgment", 
+                "Acknowledgements", 
                 style = "color: #34495E; font-weight: bold; margin-bottom: 15px; font-size: 18px;"
               ),
               p(
                 "ChemGenXplore was developed with support from the Banzhaf Lab and the Moradigaravand Lab.",
-                style = "font-size: 16px; color: #2C3E50; margin-bottom: 10px;"
+                style = "font-size: 16px; color: #2C3E50; margin-bottom: 10px; text-align: justify;"
               ),
               p(
-                "Institute of Microbiology and Infection, University of Birmingham, Birmingham, UK",
-                style = "font-size: 14px; color: #2C3E50; margin-bottom: 5px;"
+                "H.A. was funded by the Darwin Trust of Edinburgh.",
+                style = "font-size: 16px; color: #2C3E50; margin-bottom: 15px; text-align: justify;"
               ),
               p(
-                "Biosciences Institute, Faculty of Medical Sciences, Newcastle University, Newcastle Upon Tyne, UK",
-                style = "font-size: 14px; color: #2C3E50; margin-bottom: 5px;"
+                "Affiliated institutions include:",
+                style = "font-size: 14px; color: #2C3E50; margin-bottom: 8px; text-align: justify;"
               ),
-              p(
-                "Laboratory of Infectious Disease Epidemiology, KAUST Center of Excellence for Smart Health and Biological and Environmental Science and Engineering (BESE) Division, King Abdullah University of Science and Technology (KAUST), Thuwal, Saudi Arabia",
-                style = "font-size: 14px; color: #2C3E50; margin-bottom: 20px;"
-              ),
-              p(
-                "Financial support was provided by the Darwin Trust of Edinburgh.",
-                style = "font-size: 16px; color: #2C3E50; margin-bottom: 20px;"
+              tags$ul(
+                style = "font-size: 14px; color: #2C3E50; padding-left: 20px; margin-bottom: 20px;",
+                tags$li("Institute of Microbiology and Infection, University of Birmingham, Birmingham, UK"),
+                tags$li("Biosciences Institute, Faculty of Medical Sciences, Newcastle University, Newcastle Upon Tyne, UK"),
+                tags$li("Laboratory of Infectious Disease Epidemiology, KAUST Center of Excellence for Smart Health and Biological and Environmental Science and Engineering (BESE) Division, King Abdullah University of Science and Technology (KAUST), Thuwal, Saudi Arabia"),
+                
               ),
               tags$hr(style = "border-color: #1ABC9C; margin: 20px 0;"),
+              
               
               # Contact Section
               h3(
                 tags$span(style = "color: #1ABC9C; margin-right: 10px;", tags$i(class = "fas fa-envelope")), 
-                "Contact Information", 
+                "Contact", 
                 style = "color: #34495E; font-weight: bold; margin-bottom: 15px; font-size: 18px;"
               ),
               p(
                 "For questions or suggestions for additional features, please contact:",
-                style = "font-size: 16px; color: #2C3E50; margin-bottom: 10px;"
+                style = "font-size: 16px; color: #2C3E50; margin-bottom: 12px; text-align: justify;"
               ),
-              p(
-                "Huda Ahmad: ",
-                tags$a(href = "mailto:hxa105@student.bham.ac.uk", "hxa105@student.bham.ac.uk", 
-                       style = "color: #0047AB; text-decoration: none; font-weight: normal;"),
-                style = "font-size: 14px; color: #2C3E50; margin-bottom: 10px;"
-              ),
-              p(
-                "Manuel Banzhaf: ",
-                tags$a(href = "mailto:manuel.banzhaf@newcastle.ac.uk", "manuel.banzhaf@newcastle.ac.uk", 
-                       style = "color: #0047AB; text-decoration: none; font-weight: normal;"),
-                style = "font-size: 14px; color: #2C3E50; margin-bottom: 10px;"
-              ),
-              p(
-                "Danesh Moradigaravand: ",
-                tags$a(href = "mailto:danesh.moradigaravand@kaust.edu.sa", "danesh.moradigaravand@kaust.edu.sa", 
-                       style = "color: #0047AB; text-decoration: none; font-weight: normal;"),
-                style = "font-size: 14px; color: #2C3E50;"
-              )
-            )
-          )
-        )
-      ),
+              tags$ul(
+                style = "font-size: 14px; color: #2C3E50; padding-left: 20px;",
+                tags$li(
+                  "Huda Ahmad: ",
+                  tags$a(href = "mailto:hxa105@student.bham.ac.uk", "hxa105@student.bham.ac.uk", 
+                         style = "color: #0047AB; text-decoration: none; font-weight: normal;")
+                ),
+                tags$li(
+                  "Manuel Banzhaf: ",
+                  tags$a(href = "mailto:manuel.banzhaf@newcastle.ac.uk", "manuel.banzhaf@newcastle.ac.uk", 
+                         style = "color: #0047AB; text-decoration: none; font-weight: normal;")
+                ),
+                tags$li(
+                  "Danesh Moradigaravand: ",
+                  tags$a(href = "mailto:danesh.moradigaravand@kaust.edu.sa", "danesh.moradigaravand@kaust.edu.sa", 
+                         style = "color: #0047AB; text-decoration: none; font-weight: normal;")
+                )
+              ) )))),
+              
+      
       # User Guide tab content
       tabItem(
         tabName = "user_guide",
@@ -313,32 +413,36 @@ ui <- dashboardPage(
                   )
                 ),
                 
-                
-                # E. coli Section
-                bsCollapsePanel(
-                  title = "E. coli",
-                  style = "success",
-                  tags$p(
-                    "This section provides an overview of the analyses available for the preloaded E. coli datasets. All analysis types allow users to adjust False Discovery Rate (FDR) thresholds to refine results and access interactive plots and tables for download."
-                  ),
+                # Pre-loaded Datasets (E. coli & S. cerevisiae) Section
+                    bsCollapsePanel(
+                      title = HTML(
+                        "Pre-loaded Datasets (<span class='taxon'>E. coli</span> & <span class='taxon'>S. cerevisiae</span>)"
+                      ),
+                      style = "success",
+                      tags$p(HTML(
+                        "This section provides an overview of the analyses available for the pre-loaded datasets. 
+     All analysis types apply to both <em>E. coli</em> and <em>S. cerevisiae</em> and allow users to adjust 
+     False Discovery Rate (FDR) thresholds to refine results. Each analysis provides interactive 
+     plots and tables with the option to download outputs for further use."
+                      )),
                   
-                  # Phenotypes Visualization Section
+                  # Phenotypes Visualisation Section
                   bsCollapsePanel(
                     title = "Phenotypes Visualisation",
                     style = "info",
-                    tags$p(
-                      "This section focuses on visualising the number of phenotypes associated with selected genes or conditions across preloaded datasets. Users can adjust False Discovery Rate (FDR) thresholds to identify statistically significant phenotypes. Results are displayed as interactive bar plots and tables, with the option to download both for further analysis. An additional table is available, listing all phenotypes without applying the FDR threshold for a comprehensive overview."
-                    ),
+                    tags$p(HTML(
+                    "This section focuses on visualising the number of phenotypes associated with selected genes or conditions across preloaded datasets. Users can adjust False Discovery Rate (FDR) thresholds to identify statistically significant phenotypes. Results are displayed as interactive bar plots and tables, with the option to download both for further analysis. An additional table is available, listing all phenotypes without applying the FDR threshold for a comprehensive overview."
+                    )),
                     tags$h4(
                       "Gene-Level",
                       style = "color: #104E8B; font-weight: bold; margin-top: 20px;"
                     ),
                     tags$ul(
-                      tags$li("Navigate to 'E. coli' > 'Phenotypes' > 'Gene-Level'."),
-                      tags$li("Select one or more genes of interest using the dropdown menu."),
-                      tags$li("Adjust the FDR threshold slider to filter significant phenotypes."),
-                      tags$li("View results as interactive bar plots and data tables."),
-                      tags$li("Download plots and tables using the provided buttons.")
+                      tags$li(HTML("Go to <i>E. coli</i> or <i>S. cerevisiae</i> ▸ Phenotypes ▸ Gene-Level.")),
+                      tags$li("Select one or more genes from the dropdown."),
+                      tags$li("Adjust the FDR slider to filter significant phenotypes."),
+                      tags$li("Review interactive bar plots and data tables."),
+                      tags$li("Download plots and tables using the buttons provided.")
                     ),
                     tags$hr(style = "border-color: #D3D3D3; margin: 20px 0;"),
                     tags$h4(
@@ -346,31 +450,32 @@ ui <- dashboardPage(
                       style = "color: #104E8B; font-weight: bold; margin-top: 20px;"
                     ),
                     tags$ul(
-                      tags$li("Navigate to 'E. coli' > 'Phenotypes' > 'Condition-Level'."),
-                      tags$li("Select one or more conditions of interest using the dropdown menu."),
-                      tags$li("Adjust the FDR threshold slider to filter significant phenotypes."),
-                      tags$li("View results as interactive bar plots and data tables."),
-                      tags$li("Download plots and tables using the provided buttons.")
+                      tags$li(HTML("Go to <i>E. coli</i> or <i>S. cerevisiae</i> ▸ Phenotypes ▸ Condition-Level.")),
+                      tags$li("Select one or more conditions from the dropdown."),
+                      tags$li("Adjust the FDR slider to filter significant phenotypes."),
+                      tags$li("Review interactive bar plots and data tables."),
+                      tags$li("Download plots and tables using the buttons provided.")
                     )
                   ),
                   
+
                   # Correlation Analysis Section
                   bsCollapsePanel(
                     title = "Correlation Analysis",
                     style = "info",
-                    tags$p(
-                      "This section focuses on exploring correlations between genes or conditions based on their fitness profiles across preloaded datasets. Users can adjust False Discovery Rate (FDR) thresholds to identify statistically significant correlations. Results are displayed as interactive bar plots and tables, with the option to download both for further analysis. An additional table is available, listing all correlations without applying the FDR threshold for a comprehensive overview."
-                    ),
+                    tags$p(HTML(
+                      "This section focuses on visualising correlations between selected genes or conditions across pre-loaded <i>E. coli</i> and <i>S. cerevisiae</i> datasets. Users can adjust False Discovery Rate (FDR) thresholds to identify statistically significant correlations. Results are displayed as interactive bar plots and tables, with the option to download both for further analysis. An additional table is available, listing all correlations without applying the FDR threshold for a comprehensive overview."
+                    )),
                     tags$h4(
                       "Gene-Level",
                       style = "color: #104E8B; font-weight: bold; margin-top: 20px;"
                     ),
                     tags$ul(
-                      tags$li("Navigate to 'E. coli' > 'Correlation Analysis' > 'Gene-Level'."),
-                      tags$li("Select one or more genes using the dropdown menu."),
-                      tags$li("Adjust the FDR threshold slider to filter significant correlations."),
-                      tags$li("View correlation results as bar plots and data tables."),
-                      tags$li("Download plots and tables using the provided buttons.")
+                      tags$li(HTML("Go to <i>E. coli</i> or <i>S. cerevisiae</i> ▸ Correlation Analysis ▸ Gene-Level.")),
+                      tags$li("Select one or more genes from the dropdown."),
+                      tags$li("Adjust the FDR slider to filter significant correlations."),
+                      tags$li("Review interactive bar plots and data tables."),
+                      tags$li("Download plots and tables using the buttons provided.")
                     ),
                     tags$hr(style = "border-color: #D3D3D3; margin: 20px 0;"),
                     tags$h4(
@@ -378,11 +483,11 @@ ui <- dashboardPage(
                       style = "color: #104E8B; font-weight: bold; margin-top: 20px;"
                     ),
                     tags$ul(
-                      tags$li("Navigate to 'E. coli' > 'Correlation Analysis' > 'Condition-Level'."),
-                      tags$li("Select one or more conditions of interest using the dropdown menu."),
-                      tags$li("Adjust the FDR threshold slider to filter significant correlations."),
-                      tags$li("View correlation results as bar plots and data tables."),
-                      tags$li("Download plots and tables using the provided buttons.")
+                      tags$li(HTML("Go to <i>E. coli</i> or <i>S. cerevisiae</i> ▸ Correlation Analysis ▸ Condition-Level.")),
+                      tags$li("Select one or more conditions from the dropdown."),
+                      tags$li("Adjust the FDR slider to filter significant correlations."),
+                      tags$li("Review interactive bar plots and data tables."),
+                      tags$li("Download plots and tables using the buttons provided.")
                     )
                   ),
                   
@@ -390,19 +495,19 @@ ui <- dashboardPage(
                   bsCollapsePanel(
                     title = "Enrichment Analysis",
                     style = "info",
-                    tags$p(
-                      "This section focuses on identifying biological processes or pathways associated with a set of genes through enrichment analysis. Both Gene Ontology (GO) and KEGG pathway enrichment analysis are supported. Users can adjust False Discovery Rate (FDR) thresholds to refine results. Results are displayed as interactive bar plots and tables, with the option to download both for further analysis. An additional table is available, listing all enrichment results without applying the FDR threshold for a comprehensive overview."
-                    ),
+                    tags$p(HTML(
+                      "This section focuses on identifying enriched biological processes and pathways associated with selected genes across pre-loaded <i>E. coli</i> and <i>S. cerevisiae</i> datasets. Users can adjust False Discovery Rate (FDR) thresholds to identify statistically significant terms. Results are displayed as interactive bar plots and tables, with the option to download both for further analysis. An additional table is available, listing all enrichment results without applying the FDR threshold for a comprehensive overview."
+                    )),
                     tags$h4(
                       "GO Enrichment",
                       style = "color: #104E8B; font-weight: bold; margin-top: 20px;"
                     ),
                     tags$ul(
-                      tags$li("Navigate to 'E. coli' > 'Enrichment Analysis' > 'GO Enrichment'."),
-                      tags$li("Select one or more genes using the dropdown menu."),
-                      tags$li("Adjust the FDR threshold slider to filter significant results."),
-                      tags$li("View results as bar plots and data tables."),
-                      tags$li("Download plots and tables using the provided buttons.")
+                      tags$li(HTML("Go to <i>E. coli</i> or <i>S. cerevisiae</i> ▸ Enrichment Analysis ▸ GO Enrichment.")),
+                      tags$li("Select one or more genes from the dropdown."),
+                      tags$li("Adjust the FDR slider to filter significant terms."),
+                      tags$li("Review interactive bar plots and data tables."),
+                      tags$li("Download plots and tables using the buttons provided.")
                     ),
                     tags$hr(style = "border-color: #D3D3D3; margin: 20px 0;"),
                     tags$h4(
@@ -410,37 +515,95 @@ ui <- dashboardPage(
                       style = "color: #104E8B; font-weight: bold; margin-top: 20px;"
                     ),
                     tags$ul(
-                      tags$li("Navigate to 'E. coli' > 'Enrichment Analysis' > 'KEGG Enrichment'."),
-                      tags$li("Repeat the steps outlined for GO Enrichment.")
+                      tags$li(HTML("Go to <i>E. coli</i> or <i>S. cerevisiae</i> ▸ Enrichment Analysis ▸ KEGG Enrichment.")),
+                      tags$li("Repeat the same steps as for GO Enrichment."),
+                      tags$li("Adjust the FDR slider to filter significant pathways."),
+                      tags$li("Review interactive bar plots and data tables."),
+                      tags$li("Download plots and tables using the buttons provided.")
                     )
                   ),
+                  
                   
                   # Heatmaps Section
                   bsCollapsePanel(
                     title = "Heatmaps",
                     style = "info",
-                    tags$p(
-                      "This section focuses on visualising fitness data across genes and conditions through interactive heatmaps. Users can customise clustering options and distance metrics to refine the visualisation. Results are displayed as interactive heatmaps, with the option to download both the heatmap images and the associated data tables for further analysis."
-                    ),
+                    tags$p(HTML(
+                      "This section focuses on visualising fitness profiles across genes and conditions for pre-loaded <i>E. coli</i> and <i>S. cerevisiae</i> datasets using interactive heatmaps. Users can customise clustering options and distance metrics to refine the visualisation. Results are displayed as interactive heatmaps and tables, with the option to download both for further analysis. An additional table is available, listing the selected data used to generate the heatmap for a comprehensive overview."
+                    )),
                     tags$ul(
-                      tags$li("Navigate to 'E. coli' > 'Heatmaps'."),
+                      tags$li(HTML("Go to <i>E. coli</i> or <i>S. cerevisiae</i> ▸ Heatmaps.")),
                       tags$li("Select datasets, genes, and conditions to generate heatmaps."),
-                      tags$li("Options include clustering rows or columns, choosing distance metrics, and downloading heatmap images and data tables.")
+                      tags$li("Optionally cluster rows and/or columns and choose a distance metric."),
+                      tags$li("Download images and data tables using the buttons provided.")
                     )
                   )
-                ),
+                    ),
+                  
                 
                 # Upload Your Dataset Section
                 bsCollapsePanel(
                   title = "Uploading a Dataset",
                   style = "warning",
-                  tags$p(
-                    "This section allows users to upload custom datasets for analysis. Uploaded datasets must be correctly formatted for compatibility, with rows representing genes or mutants and columns representing conditions. Once uploaded, users can explore phenotypes, correlations, enrichment analysis, and heatmap generation using the same tools and workflows available in the E. coli tab."
-                  ),
+                  tags$p(HTML(
+                    "This section allows users to upload custom datasets for analysis. Uploaded datasets must be formatted with genes/strains as rows and conditions as columns. Once uploaded, users can explore phenotypes, correlations, enrichment analysis, and heatmap generation using the same tools and workflows available for the pre-loaded datasets."
+                  )),
                   tags$ul(
-                    tags$li("Navigate to 'Upload Your Dataset'."),
-                    tags$li("Upload a CSV file where rows contain unique identifiers (e.g., genes, samples, strains) and columns contain experimental measurements (e.g., fitness scores, gene expression levels, growth rates)."),
-                    tags$li("Follow the same steps for phenotypes, correlation analysis, enrichment analysis, and heatmap generation as the E. coli tab.")
+                    tags$li(HTML("Go to <b>Upload Your Dataset</b>.")),
+                    tags$li("Upload a CSV file where the first column contains unique gene/strain identifiers and all remaining columns contain numeric values."),
+                    tags$li("Explore Phenotypes, Correlation Analysis, Enrichment Analysis, and Heatmaps using the same steps as described above.")
+                  )
+                ),
+                
+                # Omics Integration Section (accordion-style sub-sections)
+                bsCollapsePanel(
+                  title = "Omics Integration",
+                  style = "info",
+                  
+                  tags$p(HTML(
+                    "This section focuses on integrating chemical genomic data with an omics dataset (e.g., transcriptomics or proteomics) to identify shared gene-level signals across datasets. Users can align by gene IDs, apply thresholds to define hits, and explore concordance through scatter plots, paired heatmaps, and overlap statistics. Results include interactive visualisations, summary tables, and downloadable outputs for further analysis."
+                  )),
+                  
+                  # Nested accordion for sub-sections
+                  bsCollapse(
+                    id = "omicsAccordion",
+                    open = NULL,  # or "Scatter Plot" if you want one open by default
+                    
+                    bsCollapsePanel(
+                      title = "Scatter Plot",
+                      style = "info",
+                      tags$ul(
+                        tags$li(HTML("Go to <i>Omics Integration</i> ▸ Scatter plot.")),
+                        tags$li("Upload one chemical-genomics CSV and one omics CSV (first column must contain Gene IDs)."),
+                        tags$li("Select one column from each dataset for comparison."),
+                        tags$li("Adjust the |score| thresholds to classify significant hits."),
+                        tags$li("Review interactive scatter plots with quadrant classification and optional gene labels."),
+                        tags$li("Download the scatter (PDF) and hit list (CSV) using the buttons provided.")
+                      )
+                    ),
+                    
+                    bsCollapsePanel(
+                      title = "Heatmaps",
+                      style = "info",
+                      tags$ul(
+                        tags$li(HTML("Go to <i>Omics Integration</i> ▸ Heatmaps.")),
+                        tags$li("Optionally select a subset of genes and columns from each dataset."),
+                        tags$li("View paired heatmaps aligned by gene with symmetric colour scales centred at zero."),
+                        tags$li("Download the heatmap data (CSV) using the button provided.")
+                      )
+                    ),
+                    
+                    bsCollapsePanel(
+                      title = "Overlap Summary",
+                      style = "info",
+                      tags$ul(
+                        tags$li(HTML("Go to <i>Omics Integration</i> ▸ Overlap Summary.")),
+                        tags$li("Set thresholds for each dataset to define significant hits."),
+                        tags$li("Review counts for Chemical Genomics only, Omics only, both significant, and neither."),
+                        tags$li("Inspect Fisher’s exact test statistics (Odds Ratio, 95% CI, p-value) to assess enrichment."),
+                        tags$li("Download the overlap summary (CSV) using the button provided.")
+                      )
+                    )
                   )
                 ),
                 
@@ -463,6 +626,7 @@ ui <- dashboardPage(
         )
       ),
       
+      
       # E.coli tab content
       tabItem(
         tabName = "ecoli",
@@ -483,13 +647,7 @@ ui <- dashboardPage(
                     "Gene-Level",
                     sidebarLayout(
                       sidebarPanel(
-                        selectizeInput(
-                          "Gene1", 
-                          "Select or Type Genes:", 
-                          choices = NULL,  # Populate with all available genes
-                          multiple = TRUE
-                        ),
-                        
+                          cgx_selectize("Gene1", "Select or Type Genes:"),
                         sliderInput(
                           "FDRq", 
                           "% FDR for phenotypes (qvals)", 
@@ -526,8 +684,7 @@ ui <- dashboardPage(
                     "Condition-Level",
                     sidebarLayout(
                       sidebarPanel(
-                        
-                        selectizeInput(
+                        cgx_selectize(
                           "cond1", 
                           "Select or Type Conditions:", 
                           choices = NULL, 
@@ -576,7 +733,7 @@ ui <- dashboardPage(
                   tabPanel("Gene-Level",
                            sidebarLayout(
                              sidebarPanel(
-                               selectizeInput(
+                               cgx_selectize(
                                  "Gene2", 
                                  "Select or Type Genes:",
                                  choices = NULL, 
@@ -609,7 +766,7 @@ ui <- dashboardPage(
                   tabPanel("Condition-Level",
                            sidebarLayout(
                              sidebarPanel(
-                               selectInput(
+                               cgx_selectize(
                                  "cond2", 
                                  "Select or Type Conditions:", 
                                  choices = NULL,
@@ -645,7 +802,7 @@ ui <- dashboardPage(
                   tabPanel("GO Enrichment",
                            sidebarLayout(
                              sidebarPanel(
-                               selectInput("Gene3", "Select or Type Genes:", choices = NULL, multiple = TRUE),
+                               cgx_selectize("Gene3", "Select or Type Genes:", choices = NULL, multiple = TRUE),
                                sliderInput("FDRq4", "FDR for GO enrichment (qvals)", min = 0, max = 100, step = 0.1, value = 100),
                                width = 3
                              ),
@@ -661,7 +818,7 @@ ui <- dashboardPage(
                                  tabPanel(
                                    "All GO Enrichment",
                                    shinycssloaders::withSpinner(DT::dataTableOutput("filetableGO")),
-                                   downloadButton('downloadgo', "Download Table")  # 
+                                   downloadButton('downloadgo', "Download Table")  
                                  ))))
                   ),
                   
@@ -669,7 +826,7 @@ ui <- dashboardPage(
                   tabPanel("KEGG Enrichment",
                            sidebarLayout(
                              sidebarPanel(
-                               selectInput("Gene4", "Select or Type Genes:", choices = NULL, multiple = TRUE),
+                               cgx_selectize("Gene4", "Select or Type Genes:", choices = NULL, multiple = TRUE),
                                sliderInput("FDRq5", "FDR for KEGG enrichment (qvals)", min = 0, max = 100, step = 0.1, value = 100),
                                width = 3
                              ),
@@ -714,8 +871,15 @@ ui <- dashboardPage(
                       choices = c("complete", "single", "average", "ward.D")
                     ),
                     selectInput(
-                      "distance_metric", "Distance Metric", 
-                      choices = c("euclidean", "manhattan", "maximum", "canberra", "binary", "minkowski")
+                      "distance_metric", "Distance Metric",
+                      choices = c(
+                        "Euclidean"      = "euclidean",
+                        "Manhattan"      = "manhattan",
+                        "Pearson"     = "pearson",
+                        "Spearman" = "spearman",
+                        "Cosine" = "cosine"
+                      ),
+                      selected = "pearson"
                     ),
                     # Add download button for heatmap data
                     downloadButton("downloadHeatmapData", "Download Heatmap Data"),
@@ -748,6 +912,277 @@ ui <- dashboardPage(
           )
         )
       ),
+     
+      # Yeast (S. cerevisiae) Tab 
+      tabItem(
+        tabName = "yeast",
+        fluidRow(
+          box(
+            width = 12,
+            tabsetPanel(
+              type = "tabs",
+              
+              # Phenotypes Parent tab
+              tabPanel(
+                title = tagList(icon("dna"), "Phenotypes"),
+                tabsetPanel(
+                  type = "tabs",
+                  
+                  # --- Gene-Level ---
+                  tabPanel(
+                    "Gene-Level",
+                    sidebarLayout(
+                      sidebarPanel(
+                        cgx_selectize(
+                          "sc_Gene1", "Select or Type Genes:",
+                          choices = NULL, multiple = TRUE
+                        ),
+                        sliderInput(
+                          "sc_FDRq", "% FDR for phenotypes (qvals)",
+                          min = 0, max = 100, step = 0.1, value = 5
+                        ),
+                        width = 3
+                      ),
+                      mainPanel(
+                        tabsetPanel(
+                          type = "tabs",
+                          tabPanel(
+                            "Significant Phenotypes",
+                            shinycssloaders::withSpinner(plotlyOutput("sc_barplotps")),
+                            downloadButton('sc_download', "Download Table"),
+                            downloadButton('sc_downloadPlot', "Download Plot"),
+                            shinycssloaders::withSpinner(DT::dataTableOutput("sc_genes_scores_sig_filetable"))
+                          ),
+                          tabPanel(
+                            "All Phenotypes",
+                            shinycssloaders::withSpinner(DT::dataTableOutput("sc_genes_scores_filetable")),
+                            downloadButton('sc_downloadAllGenesPhenotypes', "Download Table")
+                          )
+                        )
+                      )
+                    )
+                  ),
+                  
+                  # Condition-Level tab
+                  tabPanel(
+                    "Condition-Level",
+                    sidebarLayout(
+                      sidebarPanel(
+                        cgx_selectize(
+                          "sc_cond1", "Select or Type Conditions:",
+                          choices = NULL, multiple = TRUE
+                        ),
+                        sliderInput(
+                          "sc_FDRqc", "% FDR for phenotypes (qvals)",
+                          min = 0, max = 100, step = 0.1, value = 5
+                        ),
+                        width = 3
+                      ),
+                      mainPanel(
+                        tabsetPanel(
+                          type = "tabs",
+                          tabPanel(
+                            "Significant Phenotypes",
+                            shinycssloaders::withSpinner(plotlyOutput("sc_barplotpsc")),
+                            downloadButton('sc_downloadc', "Download Data"),
+                            downloadButton('sc_downloadPlotc', "Download Plot"),
+                            shinycssloaders::withSpinner(DT::dataTableOutput("sc_conditions_scores_sig_filetable"))
+                          ),
+                          tabPanel(
+                            "All Phenotypes",
+                            shinycssloaders::withSpinner(DT::dataTableOutput("sc_conditions_scores_filetable")),
+                            downloadButton('sc_downloadAllConditionsPhenotypes', "Download Table")
+                          )
+                        )
+                      )
+                    )
+                  )
+                )
+              ),
+              
+              # Correlation Analysis Parent Tab
+              tabPanel(
+                title = tagList(icon("project-diagram"), "Correlation Analysis"),
+                tabsetPanel(
+                  type = "tabs",
+                  
+                  # Gene-Level Tab
+                  tabPanel(
+                    "Gene-Level",
+                    sidebarLayout(
+                      sidebarPanel(
+                        cgx_selectize(
+                          "sc_Gene2", "Select or Type Genes:",
+                          choices = NULL, multiple = TRUE
+                        ),
+                        sliderInput(
+                          "sc_FDRq2", "% FDR for genes correlations (qvals)",
+                          min = 0, max = 100, step = 0.1, value = 5
+                        ),
+                        width = 3
+                      ),
+                      mainPanel(
+                        tabsetPanel(
+                          type = "tabs",
+                          tabPanel(
+                            "Significant Correlations",
+                            shinycssloaders::withSpinner(plotlyOutput("sc_barplot")),
+                            downloadButton('sc_download_gene_cor', "Download Data"),
+                            downloadButton('sc_downloadcorplot', "Download Plot"),
+                            shinycssloaders::withSpinner(DT::dataTableOutput("sc_genes_correlations_sig_filetable"))
+                          ),
+                          tabPanel(
+                            "All Correlations",
+                            shinycssloaders::withSpinner(DT::dataTableOutput("sc_genes_correlations_filetable")),
+                            downloadButton('sc_downloadAllCorrelations', "Download Table")
+                          )
+                        )
+                      )
+                    )
+                  ),
+                  
+                  # Condition-Level Tab
+                  tabPanel(
+                    "Condition-Level",
+                    sidebarLayout(
+                      sidebarPanel(
+                        cgx_selectize(
+                          "sc_cond2", "Select or Type Conditions:",
+                          choices = NULL, multiple = TRUE
+                        ),
+                        sliderInput(
+                          "sc_FDRq3", "% FDR for conditions correlations (qvals)",
+                          min = 0, max = 100, step = 0.1, value = 5
+                        ),
+                        width = 3
+                      ),
+                      mainPanel(
+                        tabsetPanel(
+                          type = "tabs",
+                          tabPanel(
+                            "Significant Correlations",
+                            shinycssloaders::withSpinner(plotlyOutput("sc_barplot2")),
+                            downloadButton('sc_download_cond_cor', "Download Data"),
+                            downloadButton('sc_downloadcorplot2', "Download Plot"),
+                            shinycssloaders::withSpinner(DT::dataTableOutput("sc_conditions_correlations_sig_filetable"))
+                          ),
+                          tabPanel(
+                            "All Correlations",
+                            shinycssloaders::withSpinner(DT::dataTableOutput("sc_conditions_correlations_filetable")),
+                            downloadButton('sc_downloadAllCondCorrelations', "Download Table")
+                          )
+                        )
+                      )
+                    )
+                  )
+                )
+              ),
+              
+              # Enrichment Analysis Parent Tab
+              tabPanel(
+                title = tagList(icon("chart-bar"), "Enrichment Analysis"),
+                tabsetPanel(
+                  type = "tabs",
+                  
+                  # GO Enrichment Tab
+                  tabPanel(
+                    "GO Enrichment",
+                    sidebarLayout(
+                      sidebarPanel(
+                        cgx_selectize("sc_Gene3", "Select or Type Genes:", choices = NULL, multiple = TRUE),
+                        sliderInput("sc_FDRq4", "FDR for GO enrichment (qvals)", min = 0, max = 100, step = 0.1, value = 50),
+                        width = 3
+                      ),
+                      mainPanel(
+                        tabsetPanel(
+                          type = "tabs",
+                          tabPanel(
+                            "Significant GO Enrichment",
+                            shinycssloaders::withSpinner(plotlyOutput("sc_barplotGO")),
+                            downloadButton('sc_downloadgos', "Download Data"),
+                            downloadButton('sc_downloadgoplot', "Download Plot"),
+                            shinycssloaders::withSpinner(DT::dataTableOutput("sc_filetableGOs"))
+                          ),
+                          tabPanel(
+                            "All GO Enrichment",
+                            shinycssloaders::withSpinner(DT::dataTableOutput("sc_filetableGO")),
+                            downloadButton('sc_downloadgo', "Download Table")
+                          )
+                        )
+                      )
+                    )
+                  ),
+                  
+                  # --- KEGG Enrichment ---
+                  tabPanel(
+                    "KEGG Enrichment",
+                    sidebarLayout(
+                      sidebarPanel(
+                        cgx_selectize("sc_Gene4", "Select or Type Genes:", choices = NULL, multiple = TRUE),
+                        sliderInput("sc_FDRq5", "FDR for KEGG enrichment (qvals)", min = 0, max = 100, step = 0.1, value = 100),
+                        width = 3
+                      ),
+                      mainPanel(
+                        tabsetPanel(
+                          type = "tabs",
+                          tabPanel(
+                            "Significant KEGG Enrichment",
+                            shinycssloaders::withSpinner(plotlyOutput("sc_barplotKEGG")),
+                            downloadButton('sc_downloadkeggs', "Download Data"),
+                            downloadButton('sc_downloadkeggplot', "Download Plot"),
+                            shinycssloaders::withSpinner(DT::dataTableOutput("sc_filetableKEGGs"))
+                          ),
+                          tabPanel(
+                            "All KEGG Enrichment",
+                            shinycssloaders::withSpinner(DT::dataTableOutput("sc_filetableKEGG")),
+                            downloadButton('sc_downloadkegg', "Download Table")
+                          )
+                        )
+                      )
+                    )
+                  )
+                )
+              ),
+              
+              # Heatmaps Tab
+              tabPanel(
+                title = tagList(icon("th"), "Heatmaps"),
+                sidebarLayout(
+                  sidebarPanel(
+                    uiOutput("sc_gene_selector"),
+                    uiOutput("sc_condition_selector"),
+                    checkboxInput("sc_cluster_rows", "Cluster Genes", value = TRUE),
+                    checkboxInput("sc_cluster_columns", "Cluster Conditions", value = FALSE),
+                    selectInput("sc_clustering_method", "Clustering Method",
+                                choices = c("complete", "single", "average", "ward.D")),
+                    selectInput("sc_distance_metric", "Distance Metric",
+                                choices = c("Euclidean"="euclidean","Manhattan"="manhattan",
+                                            "Pearson"="pearson","Spearman"="spearman","Cosine"="cosine"),
+                                selected = "pearson"),
+                    downloadButton("sc_downloadHeatmapData", "Download Heatmap Data"),
+                    downloadButton("sc_downloadInteractiveHeatmapPlot", "Download Interactive Heatmap Plot"),
+                    downloadButton("sc_downloadDendrogramPlot", "Download Dendrogram Plot")
+                  ),
+                  mainPanel(
+                    tabsetPanel(
+                      type = "tabs",
+                      tabPanel(
+                        "Interactive Heatmap",
+                        shinycssloaders::withSpinner(plotlyOutput("sc_heatmap_interactive", height = "800px", width = "100%"))
+                      ),
+                      tabPanel(
+                        "Dendrogram Heatmap",
+                        shinycssloaders::withSpinner(plotOutput("sc_heatmap_dendrogram", height = "800px", width = "100%"))
+                      )
+                    )
+                  )
+                )
+              )
+            )
+          )
+        )
+      ),
+      
       # Upload Your Dataset Tab
       tabItem(
         tabName = "upload_your_dataset",
@@ -784,7 +1219,7 @@ ui <- dashboardPage(
                     "Gene-Level",
                     sidebarLayout(
                       sidebarPanel(
-                        selectizeInput(
+                        cgx_selectize(
                           "Gene5", 
                           "Select or Type Genes:", 
                           choices = NULL,  # Populate with all available genes
@@ -825,7 +1260,7 @@ ui <- dashboardPage(
                     "Condition-Level",
                     sidebarLayout(
                       sidebarPanel(
-                        selectizeInput(
+                        cgx_selectize(
                           "Condition1", 
                           "Select or Type Conditions:", 
                           choices = NULL,  # Populate with all available conditions
@@ -875,7 +1310,7 @@ ui <- dashboardPage(
                     sidebarLayout(
                       sidebarPanel(
                         uiOutput("run_correlation_ui"),  # Action button 
-                        selectizeInput(
+                        cgx_selectize(
                           "Gene6",
                           "Select or Type Genes:",
                           choices = NULL,  # Dynamically populated
@@ -916,7 +1351,7 @@ ui <- dashboardPage(
                     "Condition-Level",
                     sidebarLayout(
                       sidebarPanel(
-                        selectizeInput(
+                        cgx_selectize(
                           "Condition2",
                           "Select or Type Conditions:",
                           choices = NULL,  # Dynamically populated
@@ -974,8 +1409,15 @@ ui <- dashboardPage(
                       choices = c("complete", "single", "average", "ward.D")
                     ),
                     selectInput(
-                      "distance_metric2", "Distance Metric", 
-                      choices = c("euclidean", "manhattan", "maximum", "canberra", "binary", "minkowski")
+                      "distance_metric2", "Distance Metric",
+                      choices = c(
+                        "Euclidean"      = "euclidean",
+                        "Manhattan"      = "manhattan",
+                        "Pearson"     = "pearson",
+                        "Spearman" = "spearman",
+                        "Cosine" = "cosine"
+                      ),
+                      selected = "pearson"
                     ),
                     # Add download button for heatmap data
                     downloadButton("downloadHeatmapData2", "Download Heatmap Data"),
@@ -1007,8 +1449,82 @@ ui <- dashboardPage(
             )
           )
         )
+      ), 
+      
+      # Omics Tab
+      
+      tabItem(
+        tabName = "omics",
+        # small, tab-local styles
+        tags$head(tags$style(HTML("
+    .panel-like { border:1px solid #e5e7eb; border-radius:10px; padding:14px; margin-bottom:16px; }
+    .panel-like h4 { margin-top:0; color:#2C3E50; }
+  "))),
+        fluidRow(
+          column(
+            12,
+            h3("Omics Integration"),
+            p("Upload a chemical genomics matrix and an omics matrix, align by gene IDs, and generate figures and tables.")
+          )
+        ),
+        # TOP: uploads
+        fluidRow(
+          column(
+            6,
+            div(class = "panel-like",
+                h4("Chemical Genomics Upload"),
+                fileInput("chem_file", NULL, buttonLabel = "Browse…",
+                          placeholder = "Upload Chemical Genomics CSV",
+                          accept = ".csv"),
+                helpText("Format: first column = Gene IDs; columns = conditions; values = numeric scores."),
+                shinycssloaders::withSpinner(DT::DTOutput("chem_preview"), type = 4)
+            )
+          ),
+          column(
+            6,
+            div(class = "panel-like",
+                h4("Omics Upload"),
+                fileInput("omics_file", NULL, buttonLabel = "Browse…",
+                          placeholder = "Upload Omics CSV",
+                          accept = ".csv"),
+                helpText("Format: first column = Gene IDs; columns = samples/conditions; values = numeric (e.g., log2FC)."),
+                shinycssloaders::withSpinner(DT::DTOutput("omics_preview"), type = 4)
+            )
+          )
+        ),
+        # LEFT controls + RIGHT tabs
+        fluidRow(
+          column(
+            4,
+            div(class = "panel-like",
+                h4("Alignment"),
+                verbatimTextOutput("align_stats"),
+                tags$hr(),
+                uiOutput("left_controls")
+            )
+          ),
+          column(
+            8,
+            tabsetPanel(
+              id = "inner", type = "tabs",
+              tabPanel("Scatter plot",
+                       shinycssloaders::withSpinner(plotlyOutput("scatter_plot", height = "520px"), type = 4)),
+              tabPanel("Heatmaps",
+                       shinycssloaders::withSpinner(plotlyOutput("heatmaps", height = "720px"), type = 4)),
+              tabPanel("Overlap Summary",
+                       shinycssloaders::withSpinner(plotOutput("overlap_plot", height = "320px"), type = 4),
+                       shinycssloaders::withSpinner(tableOutput("overlap_table"), type = 4))
+            )
+          )
+        )
       )
     ),
+      
+    
+    
+
+    
+    
     # Footer Section
     tags$div(
       style = "text-align: center; margin-top: 20px;",
@@ -1017,7 +1533,7 @@ ui <- dashboardPage(
         style = "font-size: 14px; color: #2C3E50;"
       )
     )
-  )
-)
-
+    ) # close dashboardBody
+    )   # close dashboardPage
+  
 

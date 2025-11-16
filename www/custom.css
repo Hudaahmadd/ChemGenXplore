@@ -1,214 +1,214 @@
-
 /* === Header Styling === */
-    .skin-blue .main-header .logo {
-      
-        background: linear-gradient(to right, #1ABC9C, #16A085); /* Gradient background */
-        font-weight: bold;
-        color: white;
-        box-shadow: 0px 4px 6px rgba(0, 0, 0, 0.1); /* Subtle shadow */
-    }
+.skin-blue .main-header .logo {
+    background: linear-gradient(to right, #1ABC9C, #16A085); /* Gradient background */
+    font-weight: bold;
+    color: white;
+    box-shadow: 0px 4px 6px rgba(0, 0, 0, 0.1); /* Subtle shadow */
+}
 
-    .skin-blue .main-header .navbar {
-        background: linear-gradient(to right, #2C3E50, #34495E); /* Gradient background */
-        box-shadow: 0px 4px 6px rgba(0, 0, 0, 0.1); /* Subtle shadow */
-    }
+.skin-blue .main-header .navbar {
+    background: linear-gradient(to right, #2C3E50, #34495E); /* Gradient background */
+    box-shadow: 0px 4px 6px rgba(0, 0, 0, 0.1); /* Subtle shadow */
+}
 
-    .skin-blue .main-sidebar {
-        background-color: #34495E;
-    }
-    .skin-blue .main-sidebar .sidebar .sidebar-menu a {
-        color: white;
-    }
-    .skin-blue .main-sidebar .sidebar .sidebar-menu a:hover {
-        background-color: #1ABC9C;
-        color: white;
-        transition: background-color 0.3s ease, color 0.3s ease; /* Smooth transition */
-    }
+.skin-blue .main-sidebar {
+    background-color: #34495E;
+}
 
-    /* Main Tab Styling */
-    .nav-tabs > li.active > a {
-        background-color: #1ABC9C !important; /* Active main tab background color */
-        color: white !important; /* Active main tab text color */
-        font-weight: bold; /* Bold font for active main tab */
-    }
-    .nav-tabs > li > a {
-        color: #2C3E50; /* Default main tab text color */
-    }
-    .nav-tabs > li > a:hover {
-        background-color: #34495E; /* Hover main tab background color */
-        color: white !important; /* Hover main tab text color */
-    }
+.skin-blue .main-sidebar .sidebar .sidebar-menu a {
+    color: white;
+}
 
-    /* Sub-Tab Styling */
-    .tab-content .nav-tabs > li.active > a {
-        background-color: #D5F5E3 !important; /* Active sub-tab lighter background color */
-        color: #2C3E50 !important; /* Active sub-tab text color */
-        font-weight: bold; /* Bold font for active sub-tab */
-    }
-    
-    .tab-content .nav-tabs > li > a {
-        color: #2C3E50; /* Default sub-tab text color */
-    }
-    .tab-content .nav-tabs > li > a:hover {
-        background-color: #E8F8F5; /* Hover sub-tab background color */
-        color: #2C3E50 !important; /* Hover sub-tab text color */
-    }
+.skin-blue .main-sidebar .sidebar .sidebar-menu a:hover {
+    background-color: #1ABC9C;
+    color: white;
+    transition: background-color 0.3s ease, color 0.3s ease; /* Smooth transition */
+}
 
-    /* Tab Transition Animations */
-    .tab-content {
-        position: relative;
-        overflow: hidden;
+/* Main Tab Styling */
+.nav-tabs > li.active > a {
+    background-color: #1ABC9C !important; /* Active main tab background color */
+    color: white !important; /* Active main tab text color */
+    font-weight: bold; /* Bold font for active main tab */
+}
+.nav-tabs > li > a {
+    color: #2C3E50; /* Default main tab text color */
+}
+.nav-tabs > li > a:hover {
+    background-color: #34495E; /* Hover main tab background color */
+    color: white !important; /* Hover main tab text color */
+}
+
+/* Sub-Tab Styling */
+.tab-content .nav-tabs > li.active > a {
+    background-color: #D5F5E3 !important; /* Active sub-tab lighter background color */
+    color: #2C3E50 !important; /* Active sub-tab text color */
+    font-weight: bold; /* Bold font for active sub-tab */
+}
+
+.tab-content .nav-tabs > li > a {
+    color: #2C3E50; /* Default sub-tab text color */
+}
+.tab-content .nav-tabs > li > a:hover {
+    background-color: #E8F8F5; /* Hover sub-tab background color */
+    color: #2C3E50 !important; /* Hover sub-tab text color */
+}
+
+/* Tab Transition Animations */
+.tab-content {
+    position: relative;
+    overflow: hidden;
+}
+.tab-pane {
+    animation: fadeEffect 0.4s ease-in-out;
+}
+@keyframes fadeEffect {
+    from {
+        opacity: 0;
+        transform: translateY(10px);
     }
-    .tab-pane {
-        animation: fadeEffect 0.4s ease-in-out;
+    to {
+        opacity: 1;
+        transform: translateY(0);
     }
-    @keyframes fadeEffect {
-        from {
-            opacity: 0;
-            transform: translateY(10px);
-        }
-        to {
-            opacity: 1;
-            transform: translateY(0);
-        }
-    }
-    
-      @keyframes fadeIn {
+}
+
+@keyframes fadeIn {
     from {
       opacity: 0;
     }
     to {
       opacity: 1;
     }
-  }
-  .logo-animation {
+}
+.logo-animation {
     animation: fadeIn 1.5s ease-in-out;
-  }
-  
-    /* Responsive Logo */
-  .logo {
+}
+
+/* Responsive Logo */
+.logo {
     max-width: 100%; /* Scale down on smaller screens */
     height: auto; /* Maintain aspect ratio */
-  }
-  
-  /* Flexbox for centered content */
-  .centered {
+}
+
+/* Flexbox for centered content */
+.centered {
     display: flex;
     justify-content: center;
     align-items: center;
     flex-direction: column;
-  }
-  
-  /* Media Query for small screens */
-  @media (max-width: 768px) {
+}
+
+/* Media Query for small screens */
+@media (max-width: 768px) {
     .logo {
       max-width: 80%; /* Slightly smaller logo for narrow screens */
     }
-  }
-  
-  /* === Card and Box Design === */
-  .box {
-      border-radius: 12px; /* Rounded corners */
-      box-shadow: 0px 4px 8px rgba(0, 0, 0, 0.1); /* Subtle shadow for depth */
-      background-color: #FFFFFF; /* White background for clean design */
-      margin-bottom: 20px; /* Space between boxes */
-      transition: transform 0.2s ease-in-out; /* Smooth hover effect */
-  }
-  
-  .box:hover {
-      box-shadow: 0px 6px 12px rgba(0, 0, 0, 0.15); /* Enhanced shadow on hover */
-  transition: transform 0.2s ease-in-out; /* Smooth transition */
-  }
-  
-  .box {
-      overflow: hidden; /* Prevent content overflow */
-  }
-  
-  .box-body {
-      padding: 20px; /* Consistent padding inside boxes */
-      font-size: 16px; /* Adjusted font size for readability */
-      line-height: 1.5; /* Improve text spacing */
-  }
-  
-  /* Styling for Titles Inside Boxes */
-  .box-header {
-      font-weight: bold; /* Emphasize box headers */
-      font-size: 18px; /* Slightly larger font size */
-      color: #2C3E50; /* Dark gray for better readability */
-      border-bottom: 2px solid #E0E0E0; /* Add a bottom border for separation */
-      padding-bottom: 10px; /* Spacing below header */
-      margin-bottom: 15px; /* Space between header and content */
-  }
-  
-      /* === Footer Styling === */
-  .footer-center a {
-      color: #1ABC9C; /* Match the green accent color */
-      text-decoration: none; /* Remove underline */
-      font-weight: bold; /* Bold for emphasis */
-  }
-  
-  .footer-center a:hover {
-      color: #16A085; /* Slightly darker green for hover */
-      text-decoration: underline; /* Underline on hover */
-  }
+}
 
-  /* === Typography Enhancements === */
-  /* Global font and base size */
-  body {
-      font-family: 'Roboto', sans-serif; /* Use Roboto or fallback to sans-serif */
-      font-size: 14px; /* Base font size */
-      line-height: 1.6; /* Line height for better readability */
-      color: #2C3E50; /* Dark gray text color */
-  }
-  
-  /* Headers */
-  h1, h2, h3 {
-      font-weight: bold; /* Emphasize headers */
-      color: #00509E; /* Blue color for headers */
-      margin-bottom: 10px; /* Add space below headers */
-  }
-  
-  h1 {
-      font-size: 2rem; /* Larger size for main headers */
-  }
-  
-  h2 {
-      font-size: 1.75rem; /* Slightly smaller for subheaders */
-  }
-  
-  h3 {
-      font-size: 1.5rem; /* Smaller headers */
-  }
-  
-  /* Paragraphs */
-  p {
-      font-size: 14px;
-      color: #2C3E50;
-      margin-bottom: 15px; /* Spacing between paragraphs */
-  }
-  
-  /* Links */
-  a {
-      color: #1ABC9C; /* Green link color */
-      text-decoration: none; /* Remove underline */
-      font-weight: bold;
-      transition: color 0.3s ease; /* Smooth color transition on hover */
-  }
-  
-  a:hover {
-      color: #16A085; /* Slightly darker green on hover */
-  }
-  
-  /* Lists */
-  ul {
-      padding-left: 20px; /* Indent list items */
-      font-size: 14px;
-  }
-  
-  li {
-      margin-bottom: 10px; /* Add spacing between list items */
-  }
-  
+/* === Card and Box Design === */
+.box {
+    border-radius: 12px; /* Rounded corners */
+    box-shadow: 0px 4px 8px rgba(0, 0, 0, 0.1); /* Subtle shadow for depth */
+    background-color: #FFFFFF; /* White background for clean design */
+    margin-bottom: 20px; /* Space between boxes */
+    transition: transform 0.2s ease-in-out; /* Smooth hover effect */
+}
+
+.box:hover {
+    box-shadow: 0px 6px 12px rgba(0, 0, 0, 0.15); /* Enhanced shadow on hover */
+    transition: transform 0.2s ease-in-out; /* Smooth transition */
+}
+
+.box {
+    overflow: hidden; /* Prevent content overflow */
+}
+
+.box-body {
+    padding: 20px; /* Consistent padding inside boxes */
+    font-size: 16px; /* Adjusted font size for readability */
+    line-height: 1.5; /* Improve text spacing */
+}
+
+/* Styling for Titles Inside Boxes */
+.box-header {
+    font-weight: bold; /* Emphasize box headers */
+    font-size: 18px; /* Slightly larger font size */
+    color: #2C3E50; /* Dark gray for better readability */
+    border-bottom: 2px solid #E0E0E0; /* Add a bottom border for separation */
+    padding-bottom: 10px; /* Spacing below header */
+    margin-bottom: 15px; /* Space between header and content */
+}
+
+/* === Footer Styling === */
+.footer-center a {
+    color: #1ABC9C; /* Match the green accent color */
+    text-decoration: none; /* Remove underline */
+    font-weight: bold; /* Bold for emphasis */
+}
+
+.footer-center a:hover {
+    color: #16A085; /* Slightly darker green for hover */
+    text-decoration: underline; /* Underline on hover */
+}
+
+/* === Typography Enhancements === */
+/* Global font and base size */
+body {
+    font-family: 'Roboto', sans-serif; /* Use Roboto or fallback to sans-serif */
+    font-size: 14px; /* Base font size */
+    line-height: 1.6; /* Line height for better readability */
+    color: #2C3E50; /* Dark gray text color */
+}
+
+/* Headers */
+h1, h2, h3 {
+    font-weight: bold; /* Emphasize headers */
+    color: #00509E; /* Blue color for headers */
+    margin-bottom: 10px; /* Add space below headers */
+}
+
+h1 {
+    font-size: 2rem; /* Larger size for main headers */
+}
+
+h2 {
+    font-size: 1.75rem; /* Slightly smaller for subheaders */
+}
+
+h3 {
+    font-size: 1.5rem; /* Smaller headers */
+}
+
+/* Paragraphs */
+p {
+    font-size: 14px;
+    color: #2C3E50;
+    margin-bottom: 15px; /* Spacing between paragraphs */
+}
+
+/* Links */
+a {
+    color: #1ABC9C; /* Green link color */
+    text-decoration: none; /* Remove underline */
+    font-weight: bold;
+    transition: color 0.3s ease; /* Smooth color transition on hover */
+}
+
+a:hover {
+    color: #16A085; /* Slightly darker green on hover */
+}
+
+/* Lists */
+ul {
+    padding-left: 20px; /* Indent list items */
+    font-size: 14px;
+}
+
+li {
+    margin-bottom: 10px; /* Add spacing between list items */
+}
+
 /* Dropdown Styling */
 .selectize-input {
     background-color: #FAFAFA; /* Softer light gray background */
@@ -276,3 +276,48 @@
     background-color: #EBF3FA; /* Slightly darker greyish blue on hover */
     border-color: #C8D9E6; /* Subtle border color change on hover */
 }
+
+/* === Hide all remove (×) icons in selectize multi-inputs === */
+/* Remove any per-item remove links or theme pseudo-elements */
+.selectize-control .item .remove,
+.selectize-control .item .remove::before,
+.selectize-control .item .remove::after {
+  display: none !important;
+  content: none !important;
+}
+
+/* Hide a possible 'clear all' button some themes inject */
+.selectize-control .clear {
+  display: none !important;
+}
+
+/* Tidy chip padding now that there's no X */
+.selectize-control.multi .selectize-input > div {
+  padding-right: 6px !important;
+}
+
+/* === Force bold headers in the User Guide accordion === */
+#userGuideAccordion .panel-title > a,
+#userGuideAccordion .panel-title > a:focus,
+#userGuideAccordion .panel-title > a:hover {
+  font-weight: 700 !important;
+}
+
+/* Make species italic (and keep bold if in header) */
+#userGuideAccordion .panel-title > a .taxon {
+  font-style: italic;
+  font-weight: 700; /* stays bold in header */
+}
+
+/* If your setup uses Bootstrap cards (bsplus fallback) */
+#userGuideAccordion .card-header .btn,
+#userGuideAccordion .card-header .btn:focus,
+#userGuideAccordion .card-header .btn:hover {
+  font-weight: 700 !important;
+}
+#userGuideAccordion .card-header .taxon {
+  font-style: italic;
+  font-weight: 700;
+}
+
+
