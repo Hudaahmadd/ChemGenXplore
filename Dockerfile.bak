@@ -1,0 +1,25 @@
+FROM --platform=linux/amd64 rocker/shiny:4.3.1
+
+# system requirements
+RUN apt-get update && apt-get install -y \
+    libcurl4-openssl-dev \
+    libssl-dev \
+    libxml2-dev \
+    libxt-dev \
+    libpng-dev \
+    libjpeg-dev \
+    libfontconfig1-dev \
+    libfreetype6-dev \
+    && apt-get clean
+
+# Set working directory
+WORKDIR /home/shiny-app/
+
+# Copy all app files
+COPY . /home/shiny-app/
+
+# Install renv and restore packages
+RUN Rscript -e "install.packages('renv', repos = 'https://cloud.r-project.org'); renv::restore()"
+
+# Run app
+CMD ["R", "-e", "shiny::runApp('.', host='0.0.0.0', port=3838)"]

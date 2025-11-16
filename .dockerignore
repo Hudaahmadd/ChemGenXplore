@@ -1,0 +1,37 @@
+# VCS & OS clutter
+.git
+.DS_Store
+
+# RStudio user files
+.Rproj.user
+.Rhistory
+.RData
+.Ruserdata
+
+# renv caches (reinstalled inside image by renv::restore)
+renv/library
+renv/staging
+
+# Big local stuff you don't need inside the image
+OneDrive*
+*.png
+*.pdf
+*.pptx
+*.zip
+
+# keep app assets in www (override the ignores above)
+!www/*.png
+!www/*.jpg
+!www/*.jpeg
+!www/*.gif
+!www/*.svg
+!www/*.css
+!www/*.js
+
+# Example data (skip to shrink image; keep if you want it inside)
+# Example_Dataset/*
+
+# Test files (we WANT them in the image)
+!Test_Files/*
+# Node/JS leftovers if any
+node_modules
