@@ -50,7 +50,7 @@ Chemical genomic screens are a valuable resource for uncovering gene functions a
   - Generate scatter plots with quadrant classification based on selected score thresholds.
   - View paired heatmaps.
   - Summarise overlap categories and Fisher’s exact test statistics.
-  - Test files chemgen.csv and omics.csv are available in the Test_Files folder.
+  - Test files `chemgen.csv` and `omics.csv` are available in the `Test_Files` folder.
 
 
 **All plots and data tables generated can be downloaded.**
