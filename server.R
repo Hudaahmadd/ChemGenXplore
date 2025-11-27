@@ -1929,33 +1929,25 @@ server <- function(input, output, session) {
     content = function(file) ggsave(file, sc_plotInputcor_cond(), width = 8, height = 5)
   )
   
-  #### Server logic for GO Enrichment ####
-
-  #### ---------------- GO Enrichment (FINAL colorful version) ---------------- ####
+  #### ---------------- S. cerevisiae GO Enrichment (safe version) ---------------- ####
   
-  # Normalise once (qvalue -> numeric)
-  sc_go_norm <- reactive({
-    df <- sc_go_file
-    stopifnot(all(c("Gene","ID","Description","qvalue","Count") %in% names(df)))
-    df %>% dplyr::mutate(qvalue_num = suppressWarnings(as.numeric(qvalue)))
-  })
-  
-  # All GO enrichment for selected genes
   sc_all_go <- reactive({
     req(input$sc_Gene3)
-    sc_go_norm() %>% dplyr::filter(Gene %in% input$sc_Gene3)
+    sc_go_file %>%
+      dplyr::mutate(qvalue = suppressWarnings(as.numeric(qvalue))) %>%
+      dplyr::filter(Gene %in% input$sc_Gene3)
   })
   
-  # Filter significant terms by FDR slider
   sc_sig_go <- reactive({
     thr <- (if (is.null(input$sc_FDRq4)) 100 else input$sc_FDRq4) / 100
-    sc_all_go() %>% dplyr::filter(!is.na(qvalue_num), qvalue_num <= thr)
+    sc_all_go() %>%
+      dplyr::filter(!is.na(qvalue), qvalue <= thr)
   })
   
-  # Tables + downloads
   output$sc_filetableGO <- DT::renderDataTable({
     DT::datatable(sc_all_go(), options = list(pageLength = 10, scrollX = TRUE), rownames = FALSE)
   })
+  
   output$sc_downloadgo <- downloadHandler(
     filename = function() paste("All_GO_Enrichment_", Sys.Date(), ".csv", sep = ""),
     content  = function(file) write.csv(sc_all_go(), file, row.names = FALSE)
@@ -1966,52 +1958,44 @@ server <- function(input, output, session) {
     validate(need(nrow(dat) > 0, "No significant GO terms at this FDR. Try increasing % FDR."))
     DT::datatable(dat, options = list(pageLength = 5, scrollX = TRUE), rownames = FALSE)
   })
+  
   output$sc_downloadgos <- downloadHandler(
     filename = function() "GO_enrichment.csv",
     content  = function(fname) write.csv(sc_sig_go(), fname, row.names = FALSE)
   )
   
-  # Plot dataframe
-  sc_go_plotdf <- reactive({
-    dat <- sc_sig_go()
-    validate(need(nrow(dat) > 0, "No significant GO terms at this FDR. Try increasing % FDR."))
+  sc_plotInputGO <- reactive({
+    df <- sc_sig_go()
+    validate(need(nrow(df) > 0, "No significant GO terms at this FDR. Try increasing % FDR."))
     
-    df <- dat %>%
-      dplyr::distinct(ID, Description, Gene, Count, qvalue_num, .keep_all = TRUE) %>%
+    plot_df <- df %>%
       dplyr::group_by(Description) %>%
       dplyr::summarise(
-        N_genes   = dplyr::n_distinct(Gene),
-        TermCount = suppressWarnings(max(Count, na.rm = TRUE)),
-        q_best    = suppressWarnings(min(qvalue_num, na.rm = TRUE)),
-        .groups   = "drop"
+        Count  = sum(Count, na.rm = TRUE),
+        .groups = "drop"
       ) %>%
       dplyr::mutate(
         ShortDesc = stringr::str_extract(Description, "^[^,]+"),
-        Score     = -log10(pmax(q_best, .Machine$double.xmin))
-      ) %>%
-      dplyr::filter(Score > 0) %>%
-      dplyr::mutate(ShortDesc = forcats::fct_reorder(ShortDesc, Score))
+        ShortDesc = forcats::fct_reorder(ShortDesc, Count)
+      )
     
-    validate(need(nrow(df) > 0, "All remaining GO terms have ~zero height. Tighten FDR or switch metric."))
-    df
-  })
-  
-  # Colorful barplot (distinct fill per term)
-  sc_plotInputGO <- reactive({
-    df <- sc_go_plotdf()
-    ggplot(df, aes(x = Score, y = ShortDesc, fill = ShortDesc)) +
-      geom_col(width = 0.8, colour = "grey30", linewidth = 0.15) +
-      scale_fill_manual(
-        values = colorRampPalette(RColorBrewer::brewer.pal(8, "Set3"))(n_distinct(df$ShortDesc))
-      ) +
-      ylab(NULL) +
-      xlab(expression(-log[10](q))) +
-      scale_x_continuous(expand = expansion(mult = c(0, 0.05))) +
+    labs <- levels(plot_df$ShortDesc)
+    pal  <- colorRampPalette(RColorBrewer::brewer.pal(8, "Set3"))(length(labs))
+    names(pal) <- labs
+    
+    ggplot(plot_df, aes(x = ShortDesc, y = Count, fill = ShortDesc)) +
+      geom_bar(stat = "identity", width = 0.8, colour = "grey30", linewidth = 0.15) +
+      coord_flip() +
+      ylab("Count of Genes") +
+      xlab("") +
+      scale_fill_manual(values = pal) +
+      scale_y_continuous(expand = expansion(mult = c(0, 0.05))) +
       theme_classic() +
       theme(
-        axis.text.x  = element_text(size = 10),
-        axis.text.y  = element_text(size = 10),
-        axis.title.x = element_text(size = 11),
+        axis.text.x = element_text(size = 10),
+        axis.text.y = element_text(size = 10),
+        axis.title.y = element_text(size = 11),
+        plot.title   = element_blank(),
         legend.position = "none"
       )
   })
@@ -2028,35 +2012,28 @@ server <- function(input, output, session) {
     },
     content = function(file) ggsave(file, sc_plotInputGO(), width = 12, height = 5)
   )
-
   
-  #### Server logic for KEGG Enrichment ####
   
-  #### ---------------- KEGG Enrichment (colorful, matches GO style) ---------------- ####
   
-  # Normalize once (qvalue -> numeric)
-  sc_kegg_norm <- reactive({
-    df <- sc_kegg_file
-    stopifnot(all(c("Gene","ID","Description","qvalue","Count") %in% names(df)))
-    df %>% dplyr::mutate(qvalue_num = suppressWarnings(as.numeric(qvalue)))
-  })
+  #### ---------------- S. cerevisiae KEGG Enrichment (safe version) ---------------- ####
   
-  # All KEGG enrichment for selected genes
   sc_all_kegg <- reactive({
     req(input$sc_Gene4)
-    sc_kegg_norm() %>% dplyr::filter(Gene %in% input$sc_Gene4)
+    sc_kegg_file %>%
+      dplyr::mutate(qvalue = suppressWarnings(as.numeric(qvalue))) %>%
+      dplyr::filter(Gene %in% input$sc_Gene4)
   })
   
-  # Filter significant pathways by FDR slider
   sc_sig_kegg <- reactive({
     thr <- (if (is.null(input$sc_FDRq5)) 100 else input$sc_FDRq5) / 100
-    sc_all_kegg() %>% dplyr::filter(!is.na(qvalue_num), qvalue_num <= thr)
+    sc_all_kegg() %>%
+      dplyr::filter(!is.na(qvalue), qvalue <= thr)
   })
   
-  # Tables + downloads
   output$sc_filetableKEGG <- DT::renderDataTable({
     DT::datatable(sc_all_kegg(), options = list(pageLength = 10, scrollX = TRUE), rownames = FALSE)
   })
+  
   output$sc_downloadkegg <- downloadHandler(
     filename = function() paste("All_KEGG_Enrichment_", Sys.Date(), ".csv", sep = ""),
     content  = function(file) write.csv(sc_all_kegg(), file, row.names = FALSE)
@@ -2067,56 +2044,44 @@ server <- function(input, output, session) {
     validate(need(nrow(dat) > 0, "No significant KEGG pathways at this FDR. Try increasing % FDR."))
     DT::datatable(dat, options = list(pageLength = 5, scrollX = TRUE), rownames = FALSE)
   })
+  
   output$sc_downloadkeggs <- downloadHandler(
-    filename = function() paste("KEGG_enrichment_", Sys.Date(), ".csv", sep = ""),
+    filename = function() "KEGG_enrichment.csv",
     content  = function(fname) write.csv(sc_sig_kegg(), fname, row.names = FALSE)
   )
   
-  # Plot dataframe (one bar per pathway; height = -log10(min q) across selected genes)
-  sc_kegg_plotdf <- reactive({
-    dat <- sc_sig_kegg()
-    validate(need(nrow(dat) > 0, "No significant KEGG pathways at this FDR. Try increasing % FDR."))
+  sc_plotInputKEGG <- reactive({
+    df <- sc_sig_kegg()
+    validate(need(nrow(df) > 0, "No significant KEGG pathways at this FDR. Try increasing % FDR."))
     
-    df <- dat %>%
-      dplyr::distinct(ID, Description, Gene, Count, qvalue_num, .keep_all = TRUE) %>%
+    plot_df <- df %>%
       dplyr::group_by(Description) %>%
       dplyr::summarise(
-        N_genes   = dplyr::n_distinct(Gene),
-        PathCount = suppressWarnings(max(Count, na.rm = TRUE)),
-        q_best    = suppressWarnings(min(qvalue_num, na.rm = TRUE)),
-        .groups   = "drop"
+        Count  = sum(Count, na.rm = TRUE),
+        .groups = "drop"
       ) %>%
       dplyr::mutate(
-        ShortDesc = Description,  # keep full KEGG names (usually concise)
-        Score     = -log10(pmax(q_best, .Machine$double.xmin))
-      ) %>%
-      dplyr::filter(Score > 0) %>%
-      dplyr::mutate(ShortDesc = forcats::fct_reorder(ShortDesc, Score))
+        ShortDesc = Description,
+        ShortDesc = forcats::fct_reorder(ShortDesc, Count)
+      )
     
-    validate(need(nrow(df) > 0, "All remaining KEGG pathways have ~zero height. Tighten FDR or switch metric."))
-    df
-  })
-  
-  # Colorful barplot (distinct fill per pathway)
-  sc_plotInputKEGG <- reactive({
-    df <- sc_kegg_plotdf()
-    
-    # Palette built from final factor levels (prevents color/label mismatch)
-    labs <- levels(df$ShortDesc)
+    labs <- levels(plot_df$ShortDesc)
     pal  <- colorRampPalette(RColorBrewer::brewer.pal(8, "Set3"))(length(labs))
     names(pal) <- labs
     
-    ggplot(df, aes(x = Score, y = ShortDesc, fill = ShortDesc)) +
-      geom_col(width = 0.8, colour = "grey30", linewidth = 0.15) +
+    ggplot(plot_df, aes(x = ShortDesc, y = Count, fill = ShortDesc)) +
+      geom_bar(stat = "identity", width = 0.8, colour = "grey30", linewidth = 0.15) +
+      coord_flip() +
+      ylab("Count of Genes") +
+      xlab("") +
       scale_fill_manual(values = pal) +
-      ylab(NULL) +
-      xlab(expression(-log[10](q))) +
-      scale_x_continuous(expand = expansion(mult = c(0, 0.05))) +
+      scale_y_continuous(expand = expansion(mult = c(0, 0.05))) +
       theme_classic() +
       theme(
-        axis.text.x  = element_text(size = 10),
-        axis.text.y  = element_text(size = 10),
-        axis.title.x = element_text(size = 11),
+        axis.text.x = element_text(size = 10),
+        axis.text.y = element_text(size = 10),
+        axis.title.y = element_text(size = 11),
+        plot.title   = element_blank(),
         legend.position = "none"
       )
   })
@@ -2133,8 +2098,6 @@ server <- function(input, output, session) {
     },
     content = function(file) ggsave(file, sc_plotInputKEGG(), width = 12, height = 5)
   )
-  
-  #### ---------------- End KEGG Enrichment ---------------- ####
   
   
   
